@@ -1,0 +1,595 @@
+// Prisma Schema for FMS (Faculty Management System)
+// Geeta University - Branding Department
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// -----------------------------------------------------------------------------
+// ENUMS
+// -----------------------------------------------------------------------------
+
+enum UserRole {
+  MAIN_MANAGER
+  DEPUTY_MANAGER
+  TEAM_LEAD
+  EMPLOYEE
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum TeamRole {
+  LEAD
+  MEMBER
+  SPECIALIST
+}
+
+enum JobType {
+  CONTENT_CREATION
+  BRANDING_PRODUCTION
+  CUSTOM
+}
+
+enum JobPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum JobStatus {
+  DRAFT
+  ASSIGNED
+  IN_PROGRESS
+  UNDER_REVIEW
+  COMPLETED
+  CANCELLED
+  ON_HOLD
+}
+
+enum DeliverableType {
+  // Content Creation types
+  PHOTO_POST
+  BYTE_REEL
+  STANDARD_REEL
+  CHRONOLOGICAL_VIDEO
+  LIVE_STORY
+  PHOTOGRAPHY_CLASS
+  PRE_EVENT_PROMO_REEL
+  SCRIPTED_CINEMATIC_REEL_VIDEO
+  // Branding & Production types
+  CONTENT_MOCKUP
+  APPROVED_DESIGN
+  PRINT_ORDER_DBMS
+  SUPPLY_INSTALL
+  PACK_UPS
+  // General / fallback
+  OTHER
+}
+
+enum StageStatus {
+  NOT_INITIATED
+  IN_PROGRESS
+  COMPLETED_ON_TIME
+  LATE_COMPLETED
+  NOT_DONE
+  CANCELLED
+}
+
+enum TaskAssignmentStatus {
+  PENDING
+  ACCEPTED
+  IN_PROGRESS
+  SUBMITTED
+  COMPLETED
+  REVISION_REQUESTED
+  CANCELLED
+}
+
+enum ApprovalStatus {
+  NOT_INITIATED
+  PENDING_REVIEW
+  APPROVED
+  REVISION_REQUESTED
+  REJECTED
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  ASSIGN
+  SUBMIT
+  REVIEW
+  APPROVE
+  REJECT
+  REQUEST_REVISION
+  LOGIN
+  LOGOUT
+}
+
+// -----------------------------------------------------------------------------
+// CORE MODELS
+// -----------------------------------------------------------------------------
+
+// 1. Department
+model Department {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  code        String   @unique
+  description String?  @db.Text
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users       User[]
+  teams       Team[]
+  jobs        Job[]
+
+  @@map("departments")
+}
+
+// 2. User (Self-referencing reporting hierarchy)
+model User {
+  id             String     @id @default(cuid())
+  email          String     @unique
+  passwordHash   String
+  fullName       String
+  employeeCode   String?    @unique
+  role           UserRole   @default(EMPLOYEE)
+  status         UserStatus @default(ACTIVE)
+  phone          String?
+  avatarUrl      String?
+
+  departmentId   String?
+  department     Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+
+  // Self-referencing reporting hierarchy
+  managerId      String?
+  manager        User?      @relation("ReportingHierarchy", fields: [managerId], references: [id], onDelete: SetNull)
+  subordinates   User[]     @relation("ReportingHierarchy")
+
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  // Relationships
+  teamMemberships       TeamMembership[]
+  ownedJobs             Job[]                  @relation("JobOwner")
+  assignedJobs          Job[]                  @relation("JobAssignedDeputy")
+  assignedTasksGiven    TaskAssignment[]       @relation("TaskAssignedBy")
+  assignedTasksReceived TaskAssignment[]       @relation("TaskAssignedTo")
+  workSubmissions       WorkSubmission[]       @relation("SubmissionSubmittedBy")
+  approvalReviews       ApprovalReview[]       @relation("Reviewer")
+  performanceRatingsGiven    PerformanceRating[] @relation("RatingGivenBy")
+  performanceRatingsReceived PerformanceRating[] @relation("RatingReceivedBy")
+  creditLedgerEntries   CreditLedgerEntry[]
+  salaryRecords         SalaryRecord[]
+  activityLogs          ActivityLog[]
+  notifications         Notification[]
+
+  @@index([departmentId])
+  @@index([managerId])
+  @@index([role])
+  @@index([status])
+  @@map("users")
+}
+
+// 3. Team
+model Team {
+  id          String   @id @default(cuid())
+  name        String
+  code        String?  @unique
+  description String?  @db.Text
+  isActive    Boolean  @default(true)
+
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  memberships TeamMembership[]
+  jobs        Job[]
+
+  @@index([departmentId])
+  @@map("teams")
+}
+
+// 4. TeamMembership
+model TeamMembership {
+  id        String   @id @default(cuid())
+  userId    String
+  teamId    String
+  teamRole  TeamRole @default(MEMBER)
+  joinedAt  DateTime @default(now())
+  leftAt    DateTime?
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, teamId])
+  @@index([teamId])
+  @@index([userId])
+  @@map("team_memberships")
+}
+
+// 5. Job
+model Job {
+  id               String      @id @default(cuid())
+  title            String
+  code             String?     @unique
+  description      String?     @db.Text
+  jobType          JobType     @default(CONTENT_CREATION)
+  category         String?     // Events, Placement, Meta Ads, Campus Life, etc.
+  priority         JobPriority @default(MEDIUM)
+  status           JobStatus   @default(DRAFT)
+
+  // Venue, Organizer, Event info for Branding & Production
+  eventDate        DateTime?
+  venue            String?
+  organizer        String?
+
+  departmentId     String
+  department       Department  @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  teamId           String?
+  team             Team?       @relation(fields: [teamId], references: [id], onDelete: SetNull)
+
+  // Job Creator / Owner
+  createdById      String
+  createdBy        User        @relation("JobOwner", fields: [createdById], references: [id], onDelete: Restrict)
+
+  // Deputy Manager Assigned
+  assignedDeputyId String?
+  assignedDeputy   User?       @relation("JobAssignedDeputy", fields: [assignedDeputyId], references: [id], onDelete: SetNull)
+
+  targetDate       DateTime?
+  completedAt      DateTime?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  deliverables     Deliverable[]
+  activityLogs     ActivityLog[]
+
+  @@index([departmentId])
+  @@index([teamId])
+  @@index([createdById])
+  @@index([assignedDeputyId])
+  @@index([status])
+  @@index([jobType])
+  @@map("jobs")
+}
+
+// 6. Deliverable
+model Deliverable {
+  id              String          @id @default(cuid())
+  jobId           String
+  job             Job             @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  title           String
+  description     String?         @db.Text
+  deliverableType DeliverableType @default(PHOTO_POST)
+
+  targetDate      DateTime?
+  completedAt     DateTime?
+  status          StageStatus     @default(NOT_INITIATED)
+  approvalStatus  ApprovalStatus  @default(NOT_INITIATED)
+
+  // External Links & Metadata
+  googleDriveUrl  String?         @db.Text
+  rawFootageUrl   String?         @db.Text
+  approvedVideoUrl String?        @db.Text
+  livePostUrl     String?         @db.Text
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  stages          DeliverableStage[]
+  tasks           TaskAssignment[]
+  reviews         ApprovalReview[]
+  ratings         PerformanceRating[]
+  creditEntries   CreditLedgerEntry[]
+
+  @@index([jobId])
+  @@index([deliverableType])
+  @@index([status])
+  @@map("deliverables")
+}
+
+// 7. WorkflowTemplate
+model WorkflowTemplate {
+  id          String   @id @default(cuid())
+  name        String
+  jobType     JobType
+  description String?  @db.Text
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  stages      WorkflowStageTemplate[]
+
+  @@map("workflow_templates")
+}
+
+// 8. WorkflowStageTemplate
+model WorkflowStageTemplate {
+  id                 String           @id @default(cuid())
+  templateId         String
+  template           WorkflowTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  name               String
+  stageOrder         Int
+  defaultTargetDays  Int              @default(1)
+  description        String?          @db.Text
+  requiresApproval   Boolean          @default(true)
+
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@index([templateId, stageOrder])
+  @@map("workflow_stage_templates")
+}
+
+// 9. DeliverableStage
+model DeliverableStage {
+  id               String         @id @default(cuid())
+  deliverableId    String
+  deliverable      Deliverable    @relation(fields: [deliverableId], references: [id], onDelete: Cascade)
+
+  name             String
+  stageOrder       Int
+  status           StageStatus    @default(NOT_INITIATED)
+  approvalStatus   ApprovalStatus @default(NOT_INITIATED)
+
+  targetDate       DateTime?
+  completedAt      DateTime?
+  driveUrl         String?        @db.Text
+
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  tasks            TaskAssignment[]
+  submissions      WorkSubmission[]
+
+  @@index([deliverableId, stageOrder])
+  @@map("deliverable_stages")
+}
+
+// 10. TaskAssignment
+model TaskAssignment {
+  id                 String               @id @default(cuid())
+  deliverableId      String
+  deliverable        Deliverable          @relation(fields: [deliverableId], references: [id], onDelete: Cascade)
+
+  stageId            String?
+  stage              DeliverableStage?    @relation(fields: [stageId], references: [id], onDelete: SetNull)
+
+  title              String
+  instructions       String?              @db.Text
+  roleTag            String?              // CAMERAMAN, VIDEO_EDITOR, DESIGNER, etc.
+  status             TaskAssignmentStatus @default(PENDING)
+
+  assignedById       String
+  assignedBy         User                 @relation("TaskAssignedBy", fields: [assignedById], references: [id], onDelete: Restrict)
+
+  assignedToId       String
+  assignedTo         User                 @relation("TaskAssignedTo", fields: [assignedToId], references: [id], onDelete: Restrict)
+
+  scheduledStartDate DateTime?
+  actualStartDate    DateTime?
+  deadline           DateTime?
+  completedAt        DateTime?
+
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  submissions        WorkSubmission[]
+  reviews            ApprovalReview[]
+
+  @@index([deliverableId])
+  @@index([stageId])
+  @@index([assignedById])
+  @@index([assignedToId])
+  @@index([status])
+  @@map("task_assignments")
+}
+
+// 11. WorkSubmission
+model WorkSubmission {
+  id           String            @id @default(cuid())
+  taskId       String
+  task         TaskAssignment    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  stageId      String?
+  stage        DeliverableStage? @relation(fields: [stageId], references: [id], onDelete: SetNull)
+
+  submittedById String
+  submittedBy  User              @relation("SubmissionSubmittedBy", fields: [submittedById], references: [id], onDelete: Restrict)
+
+  version      Int               @default(1)
+  notes        String?           @db.Text
+  submissionUrl String?          @db.Text // Google Drive or cloud link
+  filePath     String?           // Local/Persistent storage relative path
+  fileName     String?
+  fileSizeBytes BigInt?
+  mimeType     String?
+
+  submittedAt  DateTime          @default(now())
+
+  reviews      ApprovalReview[]
+
+  @@index([taskId])
+  @@index([stageId])
+  @@index([submittedById])
+  @@map("work_submissions")
+}
+
+// 12. ApprovalReview
+model ApprovalReview {
+  id             String         @id @default(cuid())
+  deliverableId  String?
+  deliverable    Deliverable?   @relation(fields: [deliverableId], references: [id], onDelete: Cascade)
+
+  taskId         String?
+  task           TaskAssignment? @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  submissionId   String?
+  submission     WorkSubmission? @relation(fields: [submissionId], references: [id], onDelete: SetNull)
+
+  reviewerId     String
+  reviewer       User           @relation("Reviewer", fields: [reviewerId], references: [id], onDelete: Restrict)
+
+  status         ApprovalStatus
+  publicFeedback String?        @db.Text // Visible to employee
+  privateNotes   String?        @db.Text // Management only
+
+  reviewedAt     DateTime       @default(now())
+
+  @@index([deliverableId])
+  @@index([taskId])
+  @@index([submissionId])
+  @@index([reviewerId])
+  @@map("approval_reviews")
+}
+
+// 13. PerformanceRating
+model PerformanceRating {
+  id            String      @id @default(cuid())
+  deliverableId String
+  deliverable   Deliverable @relation(fields: [deliverableId], references: [id], onDelete: Cascade)
+
+  givenById     String
+  givenBy       User        @relation("RatingGivenBy", fields: [givenById], references: [id], onDelete: Restrict)
+
+  receivedById  String
+  receivedBy    User        @relation("RatingReceivedBy", fields: [receivedById], references: [id], onDelete: Restrict)
+
+  stars         Int         // 1 to 5 stars
+  feedback      String?     @db.Text
+  isManagerNote Boolean     @default(false)
+
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([deliverableId])
+  @@index([givenById])
+  @@index([receivedById])
+  @@map("performance_ratings")
+}
+
+// 14. CreditRule (Configurable policies - NOT hardcoded)
+model CreditRule {
+  id              String          @id @default(cuid())
+  name            String
+  deliverableType DeliverableType
+  baseCredits     Decimal         @db.Decimal(10, 2)
+  weight          Decimal         @default(1.00) @db.Decimal(5, 2)
+  description     String?         @db.Text
+  effectiveFrom   DateTime        @default(now())
+  effectiveTo     DateTime?
+  isActive        Boolean         @default(true)
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  entries         CreditLedgerEntry[]
+
+  @@index([deliverableType, isActive])
+  @@map("credit_rules")
+}
+
+// 15. CreditLedgerEntry
+model CreditLedgerEntry {
+  id            String       @id @default(cuid())
+  userId        String
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  deliverableId String?
+  deliverable   Deliverable? @relation(fields: [deliverableId], references: [id], onDelete: SetNull)
+
+  creditRuleId  String?
+  creditRule    CreditRule?  @relation(fields: [creditRuleId], references: [id], onDelete: SetNull)
+
+  creditsEarned Decimal      @db.Decimal(10, 2)
+  reason        String
+  source        String?      // Reference to assignment / job
+  awardedAt     DateTime     @default(now())
+
+  @@index([userId])
+  @@index([deliverableId])
+  @@index([creditRuleId])
+  @@map("credit_ledger_entries")
+}
+
+// 16. SalaryRecord (Segregated, managerial access only)
+model SalaryRecord {
+  id             String    @id @default(cuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  effectiveMonth Int       // 1 - 12
+  effectiveYear  Int
+  amount         Decimal   @db.Decimal(12, 2)
+  currency       String    @default("INR")
+  remarks        String?   @db.Text
+
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([userId, effectiveYear, effectiveMonth])
+  @@index([userId])
+  @@map("salary_records")
+}
+
+// 17. ActivityLog (Append-only audit trail)
+model ActivityLog {
+  id         String      @id @default(cuid())
+  userId     String?
+  user       User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  jobId      String?
+  job        Job?        @relation(fields: [jobId], references: [id], onDelete: SetNull)
+
+  action     AuditAction
+  entityType String      // JOB, DELIVERABLE, TASK, SUBMISSION, APPROVAL, etc.
+  entityId   String
+  details    String?     @db.Text // JSON string with previous/new state
+  ipAddress  String?
+  userAgent  String?
+
+  createdAt  DateTime    @default(now())
+
+  @@index([userId])
+  @@index([jobId])
+  @@index([action])
+  @@index([entityType, entityId])
+  @@map("activity_logs")
+}
+
+// 18. Notification
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title     String
+  message   String   @db.Text
+  link      String?
+  isRead    Boolean  @default(false)
+  readAt    DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
