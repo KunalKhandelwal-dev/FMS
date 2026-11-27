@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
 import { MobileNavigation } from "./MobileNavigation";
+import { cn } from "@/lib/utils";
 import type { SessionUser } from "@/types/auth";
 
 export function DashboardShell({
@@ -14,23 +15,32 @@ export function DashboardShell({
   children: React.ReactNode;
 }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC]">
-      {/* Desktop Collapsible / Persistent Sidebar */}
-      <Sidebar user={user} />
+    <div className="min-h-screen bg-[#F7F8FC]">
+      <Sidebar
+        user={user}
+        collapsed={collapsed}
+        onToggleCollapse={() => setCollapsed((prev) => !prev)}
+      />
 
-      {/* Mobile Drawer */}
       <MobileNavigation
         user={user}
         isOpen={mobileMenuOpen}
         onClose={() => setMobileMenuOpen(false)}
       />
 
-      {/* Main Content Area */}
-      <div className="lg:pl-64 flex flex-col min-h-screen">
+      <div
+        className={cn(
+          "flex flex-col min-h-screen transition-all duration-200",
+          collapsed ? "lg:pl-16" : "lg:pl-60"
+        )}
+      >
         <Header user={user} onOpenMobileMenu={() => setMobileMenuOpen(true)} />
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">{children}</main>
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-[1440px] w-full mx-auto">
+          {children}
+        </main>
       </div>
     </div>
   );

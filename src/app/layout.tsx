@@ -17,9 +17,9 @@ const zillaSlab = Zilla_Slab({
 });
 
 export const metadata: Metadata = {
-  title: "FMS — Faculty Management System | Geeta University",
+  title: "FMS — Faculty Management System",
   description:
-    "Internal Departmental Operations & Employee Performance Management Platform for Geeta University Branding Department.",
+    "Departmental Operations, Deliverable Tracking, and Performance Management Platform.",
 };
 
 export default function RootLayout({
@@ -29,7 +29,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${sourceSans.variable} ${zillaSlab.variable}`}>
-      <body className="min-h-screen bg-[#F8FAFC] text-[#0F172A] antialiased">{children}</body>
+      <body className="min-h-screen bg-[#F7F8FC] text-[#202638] antialiased">
+        {children}
+      </body>
     </html>
   );
 }

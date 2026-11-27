@@ -13,7 +13,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
         {label && (
           <label
             htmlFor={id}
-            className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5"
+            className="block text-xs font-medium text-[#202638] mb-1.5"
           >
             {label}
           </label>
@@ -23,13 +23,13 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
           id={id}
           ref={ref}
           className={cn(
-            "flex h-10 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0A1F44] focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50",
-            error && "border-red-500 focus:ring-red-500",
+            "flex h-9 w-full rounded-lg border border-[#E5E7EB] bg-white px-3 py-1.5 text-sm text-[#202638] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#4F46E5] focus:border-transparent disabled:cursor-not-allowed disabled:bg-[#F1F3F9] disabled:opacity-60",
+            error && "border-[#E11D48] focus:ring-[#E11D48]",
             className
           )}
           {...props}
         />
-        {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+        {error && <p className="mt-1 text-xs text-[#E11D48]">{error}</p>}
       </div>
     );
   }

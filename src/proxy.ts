@@ -3,12 +3,15 @@ import type { NextRequest } from "next/server";
 
 const PROTECTED_PREFIXES = [
   "/dashboard",
+  "/my-work",
   "/employees",
   "/teams",
   "/jobs",
   "/tasks",
   "/deliverables",
   "/approvals",
+  "/productivity",
+  "/branding-jobs",
   "/analytics",
   "/roi",
   "/settings",
@@ -29,19 +32,16 @@ export function proxy(request: NextRequest) {
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
   );
 
-  // 1. Unauthenticated user accessing protected dashboard route -> redirect to /login
   if (isProtectedPath && !sessionToken) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("redirect", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  // 2. Authenticated user visiting /login -> redirect to /dashboard
   if (pathname === "/login" && sessionToken) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
-  // Allow standard request progression
   return NextResponse.next();
 }
 

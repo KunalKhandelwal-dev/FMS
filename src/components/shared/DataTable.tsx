@@ -1,7 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { useReactTable, getCoreRowModel, flexRender, type ColumnDef } from "@tanstack/react-table";
+import {
+  useReactTable,
+  getCoreRowModel,
+  flexRender,
+  type ColumnDef,
+} from "@tanstack/react-table";
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
@@ -21,14 +26,14 @@ export function DataTable<TData, TValue>({
   });
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-xs">
+    <div className="rounded-lg border border-[#E5E7EB] bg-white overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm text-slate-600">
-          <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-700 border-b border-slate-200">
+        <table className="w-full text-left text-sm text-[#202638]">
+          <thead className="bg-[#F1F3F9] text-xs font-semibold text-[#64748B] border-b border-[#E5E7EB]">
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
-                  <th key={header.id} className="px-4 py-3.5">
+                  <th key={header.id} className="px-4 py-3 font-medium">
                     {header.isPlaceholder
                       ? null
                       : flexRender(header.column.columnDef.header, header.getContext())}
@@ -37,12 +42,12 @@ export function DataTable<TData, TValue>({
               </tr>
             ))}
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-[#E5E7EB]">
             {table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
-                <tr key={row.id} className="hover:bg-slate-50/80 transition-colors">
+                <tr key={row.id} className="hover:bg-[#F7F8FC] transition-colors">
                   {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="px-4 py-3.5">
+                    <td key={cell.id} className="px-4 py-3 text-sm">
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>
                   ))}
@@ -50,7 +55,7 @@ export function DataTable<TData, TValue>({
               ))
             ) : (
               <tr>
-                <td colSpan={columns.length} className="h-28 text-center text-slate-400">
+                <td colSpan={columns.length} className="h-24 text-center text-xs text-[#64748B]">
                   {emptyMessage}
                 </td>
               </tr>

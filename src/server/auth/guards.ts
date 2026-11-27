@@ -76,26 +76,99 @@ export async function canAccessJob(user: SessionUser, jobId: string): Promise<bo
 
   const job = await db.job.findUnique({
     where: { id: jobId },
-    select: { assignedDeputyId: true, createdById: true },
+    select: {
+      ownerId: true,
+      assignedDeputyId: true,
+      createdById: true,
+      team: {
+        select: {
+          leadId: true,
+        },
+      },
+    },
   });
 
   if (!job) return false;
 
-  // Deputy assigned or creator
-  if (job.assignedDeputyId === user.id || job.createdById === user.id) {
+  if (
+    job.ownerId === user.id ||
+    job.assignedDeputyId === user.id ||
+    job.createdById === user.id ||
+    job.team?.leadId === user.id
+  ) {
     return true;
   }
 
-  // Check if job contains deliverables assigned to this user
-  const hasTask = await db.taskAssignment.findFirst({
+  // Check if user is assigned to any deliverable or stage or task under this job
+  const assignedDeliverable = await db.deliverable.findFirst({
     where: {
-      deliverable: { jobId },
-      assignedToId: user.id,
+      jobId,
+      OR: [
+        { assignedToId: user.id },
+        { shootAssignedToId: user.id },
+        { editorAssignedToId: user.id },
+        { postAssignedToId: user.id },
+        { stages: { some: { responsibleUserId: user.id } } },
+        { tasks: { some: { assignedToId: user.id } } },
+      ],
     },
     select: { id: true },
   });
 
-  return Boolean(hasTask);
+  return Boolean(assignedDeliverable);
+}
+
+/**
+ * Verifies if user can access a specific Deliverable.
+ */
+export async function canAccessDeliverable(
+  user: SessionUser,
+  deliverableId: string
+): Promise<boolean> {
+  if (user.role === UserRole.MAIN_MANAGER) return true;
+
+  const deliverable = await db.deliverable.findUnique({
+    where: { id: deliverableId },
+    select: {
+      assignedToId: true,
+      shootAssignedToId: true,
+      editorAssignedToId: true,
+      postAssignedToId: true,
+      job: {
+        select: {
+          ownerId: true,
+          assignedDeputyId: true,
+          createdById: true,
+        },
+      },
+      stages: {
+        select: { responsibleUserId: true },
+      },
+      tasks: {
+        select: { assignedToId: true },
+      },
+    },
+  });
+
+  if (!deliverable) return false;
+
+  if (
+    deliverable.assignedToId === user.id ||
+    deliverable.shootAssignedToId === user.id ||
+    deliverable.editorAssignedToId === user.id ||
+    deliverable.postAssignedToId === user.id ||
+    deliverable.job.ownerId === user.id ||
+    deliverable.job.assignedDeputyId === user.id ||
+    deliverable.job.createdById === user.id
+  ) {
+    return true;
+  }
+
+  if (deliverable.stages.some((s) => s.responsibleUserId === user.id)) {
+    return true;
+  }
+
+  return deliverable.tasks.some((t) => t.assignedToId === user.id);
 }
 
 /**
@@ -112,7 +185,7 @@ export async function canAccessTask(user: SessionUser, taskId: string): Promise<
       deliverable: {
         select: {
           job: {
-            select: { assignedDeputyId: true },
+            select: { ownerId: true, assignedDeputyId: true },
           },
         },
       },
@@ -124,6 +197,7 @@ export async function canAccessTask(user: SessionUser, taskId: string): Promise<
   return (
     task.assignedToId === user.id ||
     task.assignedById === user.id ||
+    task.deliverable.job.ownerId === user.id ||
     task.deliverable.job.assignedDeputyId === user.id
   );
 }
@@ -135,11 +209,17 @@ export async function canManageEmployee(user: SessionUser, targetUserId: string)
   if (user.role === UserRole.MAIN_MANAGER) return true;
   if (user.id === targetUserId) return false;
 
-  // Check direct reporting hierarchy
   const target = await db.user.findUnique({
     where: { id: targetUserId },
     select: { managerId: true },
   });
 
   return target?.managerId === user.id;
+}
+
+/**
+ * Verifies if user can access restricted salary or ROI configuration data.
+ */
+export function canAccessSalaryAndRoi(user: SessionUser): boolean {
+  return user.role === UserRole.MAIN_MANAGER;
 }

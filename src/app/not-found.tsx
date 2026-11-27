@@ -3,19 +3,19 @@ import { FileQuestion, ArrowLeft } from "lucide-react";
 
 export default function NotFound() {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-[#F8FAFC] px-4">
-      <div className="w-16 h-16 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-[#E8871A] mb-6">
-        <FileQuestion className="w-8 h-8" />
+    <div className="min-h-screen flex flex-col items-center justify-center bg-[#F7F8FC] px-4">
+      <div className="w-12 h-12 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-[#4F46E5] mb-5">
+        <FileQuestion className="w-6 h-6" />
       </div>
-      <h1 className="text-3xl font-bold text-[#0A1F44] tracking-tight mb-2 font-heading">
+      <h1 className="text-xl font-semibold text-[#202638] tracking-tight mb-1.5">
         Page Not Found
       </h1>
-      <p className="text-slate-600 text-center max-w-md mb-8">
-        The requested management module or resource could not be found or may have been relocated.
+      <p className="text-sm text-[#64748B] text-center max-w-md mb-6">
+        The requested module or record could not be found or you do not have access to it.
       </p>
       <Link
         href="/dashboard"
-        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#0A1F44] text-white font-medium hover:bg-[#102C5E] transition-colors"
+        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#4F46E5] text-white text-sm font-medium hover:bg-[#4338CA] transition-colors"
       >
         <ArrowLeft className="w-4 h-4" />
         Return to Dashboard
@@ -23,4 +23,3 @@ export default function NotFound() {
     </div>
   );
 }
-

@@ -2,7 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { logoutAction } from "@/features/auth/actions";
-import { LogOut, Bell, Menu, Shield } from "lucide-react";
+import { LogOut, Bell, Menu, ChevronRight } from "lucide-react";
 import type { SessionUser } from "@/types/auth";
 import { ROLE_LABELS } from "@/lib/constants";
 
@@ -11,64 +11,78 @@ interface HeaderProps {
   onOpenMobileMenu?: () => void;
 }
 
+const ROUTE_LABELS: Record<string, string> = {
+  dashboard: "Overview",
+  jobs: "Jobs & Deliverables",
+  "my-work": "My Work",
+  approvals: "Approvals",
+  employees: "Team / Employees",
+  teams: "Teams",
+  productivity: "Productivity",
+  "branding-jobs": "Branding Jobs",
+  roi: "ROI",
+  settings: "Settings",
+  new: "Create New",
+  edit: "Edit",
+};
+
 export function Header({ user, onOpenMobileMenu }: HeaderProps) {
   const pathname = usePathname();
-
-  // Extract page title from route
-  const segment = pathname.split("/").filter(Boolean)[0] || "dashboard";
-  const title = segment.charAt(0).toUpperCase() + segment.slice(1);
+  const segments = pathname.split("/").filter(Boolean);
 
   return (
-    <header className="sticky top-0 z-20 flex h-16 w-full items-center justify-between border-b border-slate-200 bg-white/95 backdrop-blur-xs px-4 sm:px-6">
+    <header className="sticky top-0 z-20 flex h-16 w-full items-center justify-between border-b border-[#E5E7EB] bg-white px-4 sm:px-6">
       {/* Left: Mobile trigger & Breadcrumbs */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 min-w-0">
         {onOpenMobileMenu && (
           <button
             onClick={onOpenMobileMenu}
             aria-label="Open navigation menu"
-            className="lg:hidden p-2 rounded-lg text-slate-600 hover:bg-slate-100 cursor-pointer"
+            className="lg:hidden p-2 rounded-lg text-[#64748B] hover:bg-[#F1F3F9] cursor-pointer"
           >
             <Menu className="w-5 h-5" />
           </button>
         )}
-        <div className="hidden sm:flex items-center gap-2 text-xs text-slate-500">
-          <span>Geeta University</span>
-          <span>/</span>
-          <span>Branding</span>
-          <span>/</span>
-          <span className="font-semibold text-[#0A1F44]">{title}</span>
-        </div>
+        <nav aria-label="Breadcrumb" className="hidden sm:flex items-center gap-1.5 text-xs text-[#64748B]">
+          <span>FMS</span>
+          {segments.map((seg, idx) => {
+            const label = ROUTE_LABELS[seg] || seg;
+            const isLast = idx === segments.length - 1;
+            return (
+              <span key={`${seg}-${idx}`} className="flex items-center gap-1.5">
+                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                <span className={isLast ? "font-semibold text-[#202638]" : ""}>{label}</span>
+              </span>
+            );
+          })}
+        </nav>
       </div>
 
-      {/* Right: Role indicator & Actions */}
-      <div className="flex items-center gap-4">
-        {/* Role Badge */}
-        <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 border border-slate-200 text-xs font-medium text-slate-700">
-          <Shield className="w-3.5 h-3.5 text-[#E8871A]" />
-          <span>{ROLE_LABELS[user.role] || user.role}</span>
-        </div>
-
-        {/* Notifications */}
+      {/* Right: Notifications & Profile */}
+      <div className="flex items-center gap-3">
         <button
-          aria-label="View notifications"
-          className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors relative cursor-pointer"
+          aria-label="Notifications"
+          className="p-2 rounded-lg text-[#64748B] hover:bg-[#F1F3F9] hover:text-[#202638] transition-colors relative cursor-pointer"
         >
           <Bell className="w-4 h-4" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#E8871A]" />
         </button>
 
-        {/* Profile Info */}
-        <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
+        <div className="flex items-center gap-3 pl-3 border-l border-[#E5E7EB]">
           <div className="text-right hidden sm:block">
-            <p className="text-xs font-semibold text-[#0A1F44]">{user.fullName}</p>
-            <p className="text-[10px] text-slate-500">{user.email}</p>
+            <p className="text-xs font-semibold text-[#202638]">{user.fullName}</p>
+            <p className="text-[11px] text-[#64748B]">
+              {ROLE_LABELS[user.role] || user.role.replace(/_/g, " ")}
+            </p>
+          </div>
+          <div className="w-8 h-8 rounded-full bg-indigo-50 border border-indigo-200 flex items-center justify-center text-xs font-semibold text-[#4F46E5]">
+            {user.fullName.substring(0, 2).toUpperCase()}
           </div>
           <form action={logoutAction}>
             <button
               type="submit"
               title="Sign Out"
               aria-label="Sign Out"
-              className="p-2 rounded-lg text-slate-500 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer"
+              className="p-2 rounded-lg text-[#64748B] hover:bg-rose-50 hover:text-[#E11D48] transition-colors cursor-pointer"
             >
               <LogOut className="w-4 h-4" />
             </button>
@@ -78,4 +92,3 @@ export function Header({ user, onOpenMobileMenu }: HeaderProps) {
     </header>
   );
 }
-

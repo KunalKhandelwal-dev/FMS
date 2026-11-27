@@ -1,40 +1,43 @@
+import { redirect } from "next/navigation";
+import { getCurrentUser, requireRole } from "@/server/auth/guards";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Settings, Shield, Sliders } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Shield, Sliders } from "lucide-react";
 
-export default function SettingsPage() {
+export default async function SettingsPage() {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  requireRole(user, ["MAIN_MANAGER"]);
+
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Department & System Settings"
-        description="System configuration, security settings, and departmental workflow policies."
+        title="System Settings"
+        description="Departmental workflow configuration, security policy, and business rule controls."
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
-              <Sliders className="w-5 h-5 text-[#0A1F44]" />
-              <CardTitle>Workflow Engine Settings</CardTitle>
+              <Sliders className="w-4 h-4 text-[#4F46E5]" />
+              <CardTitle>Workflow Configuration</CardTitle>
             </div>
-            <CardDescription>
-              Configure default turnaround times and required sign-offs
-            </CardDescription>
+            <CardDescription>Active production pipelines and turnaround rules</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3 text-xs text-slate-600">
-            <div className="flex justify-between py-2 border-b border-slate-100">
-              <span className="font-medium text-slate-700">Content Creation Workflow</span>
-              <span className="text-emerald-700 font-semibold">Active Template</span>
+          <CardContent className="space-y-3 text-xs text-[#64748B]">
+            <div className="flex justify-between py-2 border-b border-[#E5E7EB]">
+              <span className="font-medium text-[#202638]">Content Creation Pipeline</span>
+              <Badge variant="blue">Active</Badge>
             </div>
-            <div className="flex justify-between py-2 border-b border-slate-100">
-              <span className="font-medium text-slate-700">Branding & Production (5-Stage)</span>
-              <span className="text-emerald-700 font-semibold">Active Template</span>
+            <div className="flex justify-between py-2 border-b border-[#E5E7EB]">
+              <span className="font-medium text-[#202638]">Branding &amp; Production (5-Stage)</span>
+              <Badge variant="blue">Active</Badge>
             </div>
             <div className="flex justify-between py-2">
-              <span className="font-medium text-slate-700">Turnaround Day Counting</span>
-              <span className="text-amber-700 font-semibold">
-                Pending Calendar vs. Working Days
-              </span>
+              <span className="font-medium text-[#202638]">Deadline Timezone</span>
+              <Badge variant="indigo">Asia/Kolkata</Badge>
             </div>
           </CardContent>
         </Card>
@@ -42,25 +45,23 @@ export default function SettingsPage() {
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
-              <Shield className="w-5 h-5 text-[#0A1F44]" />
-              <CardTitle>Security & Access Control</CardTitle>
+              <Shield className="w-4 h-4 text-[#4F46E5]" />
+              <CardTitle>Security &amp; Access Control</CardTitle>
             </div>
-            <CardDescription>Role definitions and active authorization controls</CardDescription>
+            <CardDescription>Server-side authorization and audit trail enforcement</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3 text-xs text-slate-600">
-            <div className="flex justify-between py-2 border-b border-slate-100">
-              <span className="font-medium text-slate-700">Database Role Guard</span>
-              <span className="text-emerald-700 font-semibold">Enforced Server-Side</span>
+          <CardContent className="space-y-3 text-xs text-[#64748B]">
+            <div className="flex justify-between py-2 border-b border-[#E5E7EB]">
+              <span className="font-medium text-[#202638]">Role-Based Access Control</span>
+              <Badge variant="blue">Enforced Server-Side</Badge>
             </div>
-            <div className="flex justify-between py-2 border-b border-slate-100">
-              <span className="font-medium text-slate-700">Session Security</span>
-              <span className="text-emerald-700 font-semibold">HttpOnly Cookie (HS256)</span>
+            <div className="flex justify-between py-2 border-b border-[#E5E7EB]">
+              <span className="font-medium text-[#202638]">Session Storage</span>
+              <Badge variant="blue">HttpOnly Cookie (HS256)</Badge>
             </div>
             <div className="flex justify-between py-2">
-              <span className="font-medium text-slate-700">Team Lead Role Tier</span>
-              <span className="text-amber-700 font-semibold">
-                Configurable (Pending Confirmation)
-              </span>
+              <span className="font-medium text-[#202638]">Audit History</span>
+              <Badge variant="indigo">Append-Only</Badge>
             </div>
           </CardContent>
         </Card>

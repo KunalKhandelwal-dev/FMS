@@ -2,7 +2,7 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "primary" | "secondary" | "outline" | "ghost" | "danger" | "orange";
+  variant?: "primary" | "secondary" | "outline" | "ghost" | "danger";
   size?: "sm" | "md" | "lg";
   isLoading?: boolean;
 }
@@ -16,19 +16,18 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       "inline-flex items-center justify-center font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer";
 
     const variantStyles = {
-      primary: "bg-[#0A1F44] text-white hover:bg-[#102C5E] focus:ring-[#0A1F44]",
-      orange: "bg-[#E8871A] text-white hover:bg-[#D0730F] focus:ring-[#E8871A]",
-      secondary: "bg-slate-100 text-slate-800 hover:bg-slate-200 focus:ring-slate-300",
+      primary: "bg-[#4F46E5] text-white hover:bg-[#4338CA] focus:ring-[#4F46E5]",
+      secondary: "bg-[#F1F3F9] text-[#202638] hover:bg-slate-200/80 focus:ring-slate-300",
       outline:
-        "border border-slate-300 text-slate-700 bg-transparent hover:bg-slate-50 focus:ring-slate-400",
-      ghost: "text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus:ring-slate-300",
-      danger: "bg-red-600 text-white hover:bg-red-700 focus:ring-red-600",
+        "border border-[#E5E7EB] text-[#202638] bg-white hover:bg-[#F7F8FC] focus:ring-indigo-500",
+      ghost: "text-[#64748B] hover:bg-[#F1F3F9] hover:text-[#202638] focus:ring-slate-300",
+      danger: "bg-[#E11D48] text-white hover:bg-rose-700 focus:ring-[#E11D48]",
     };
 
     const sizeStyles = {
       sm: "px-3 py-1.5 text-xs",
       md: "px-4 py-2 text-sm",
-      lg: "px-6 py-2.5 text-base",
+      lg: "px-5 py-2.5 text-sm",
     };
 
     return (

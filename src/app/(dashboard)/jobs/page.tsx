@@ -1,33 +1,49 @@
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { getCurrentUser } from "@/server/auth/guards";
+import { analyticsService } from "@/server/services/analyticsService";
 import { PageHeader } from "@/components/shared/PageHeader";
-import { EmptyState } from "@/components/shared/EmptyState";
-import { Briefcase, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { RecentJobsTable } from "@/features/dashboard/RecentJobsTable";
+import { Plus } from "lucide-react";
 
-export default function JobsPage() {
+export const dynamic = "force-dynamic";
+
+export default async function JobsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ search?: string; category?: string }>;
+}) {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+
+  const params = await searchParams;
+  const data = await analyticsService.getManagerDashboardData({
+    search: params.search,
+    category: params.category,
+    ...(user.role === "EMPLOYEE" ? { ownerId: user.id } : {}),
+  });
+
+  const canCreate = user.role === "MAIN_MANAGER";
+
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Master Jobs & Campaigns"
-        description="Track overarching university events, promotional campaigns, and branding initiatives."
+        title="Jobs & Deliverables"
+        description="Track departmental jobs, accountable owners, deliverable counts, and completion progress."
         action={
-          <Button variant="primary" size="sm">
-            <Plus className="w-4 h-4 mr-2" />
-            Create Master Job
-          </Button>
+          canCreate ? (
+            <Link href="/jobs/new">
+              <Button variant="primary" size="md">
+                <Plus className="w-4 h-4 mr-1.5" />
+                Create New Job
+              </Button>
+            </Link>
+          ) : undefined
         }
       />
 
-      <EmptyState
-        icon={<Briefcase className="w-8 h-8 text-[#0A1F44]" />}
-        title="No Jobs Registered"
-        description="No master campaigns or campus events have been created yet. Main Managers can register jobs and assign them to Deputy Managers for execution."
-        action={
-          <Button variant="primary" size="sm">
-            Register First Job
-          </Button>
-        }
-      />
+      <RecentJobsTable jobs={data.recentJobs} />
     </div>
   );
 }
-

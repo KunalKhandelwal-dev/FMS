@@ -29,11 +29,11 @@ export function ConfirmDialog({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-      <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl border border-slate-200">
-        <h3 className="text-lg font-semibold text-[#0A1F44] mb-2">{title}</h3>
-        <p className="text-sm text-slate-600 mb-6">{description}</p>
-        <div className="flex items-center justify-end gap-3">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+      <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-lg border border-[#E5E7EB]">
+        <h3 className="text-base font-semibold text-[#202638] mb-1.5">{title}</h3>
+        <p className="text-sm text-[#64748B] mb-5">{description}</p>
+        <div className="flex items-center justify-end gap-2.5">
           <Button variant="outline" size="sm" onClick={onCancel} disabled={isLoading}>
             {cancelLabel}
           </Button>
@@ -50,4 +50,3 @@ export function ConfirmDialog({
     </div>
   );
 }
-

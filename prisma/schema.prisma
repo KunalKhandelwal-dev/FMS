@@ -76,6 +76,24 @@ enum DeliverableType {
   OTHER
 }
 
+enum WorkflowState {
+  ASSIGNED
+  IN_PROGRESS
+  SUBMITTED
+  UNDER_REVIEW
+  REVISION_REQUESTED
+  APPROVED
+  CANCELLED
+}
+
+enum DeliveryPerformanceStatus {
+  PENDING
+  COMPLETED_ON_TIME
+  LATE_COMPLETED
+  NOT_DONE_TILL_DATE
+  CANCELLED
+}
+
 enum StageStatus {
   NOT_INITIATED
   IN_PROGRESS
@@ -144,6 +162,7 @@ model User {
   email          String     @unique
   passwordHash   String
   fullName       String
+  designation    String?
   employeeCode   String?    @unique
   role           UserRole   @default(EMPLOYEE)
   status         UserStatus @default(ACTIVE)
@@ -162,19 +181,27 @@ model User {
   updatedAt      DateTime   @updatedAt
 
   // Relationships
-  teamMemberships       TeamMembership[]
-  ownedJobs             Job[]                  @relation("JobOwner")
-  assignedJobs          Job[]                  @relation("JobAssignedDeputy")
-  assignedTasksGiven    TaskAssignment[]       @relation("TaskAssignedBy")
-  assignedTasksReceived TaskAssignment[]       @relation("TaskAssignedTo")
-  workSubmissions       WorkSubmission[]       @relation("SubmissionSubmittedBy")
-  approvalReviews       ApprovalReview[]       @relation("Reviewer")
-  performanceRatingsGiven    PerformanceRating[] @relation("RatingGivenBy")
-  performanceRatingsReceived PerformanceRating[] @relation("RatingReceivedBy")
-  creditLedgerEntries   CreditLedgerEntry[]
-  salaryRecords         SalaryRecord[]
-  activityLogs          ActivityLog[]
-  notifications         Notification[]
+  teamMemberships            TeamMembership[]
+  ledTeams                   Team[]                 @relation("TeamLeadUser")
+  createdJobs                Job[]                  @relation("JobOwner")
+  ownedJobs                  Job[]                  @relation("JobAccountableOwner")
+  assignedJobs               Job[]                  @relation("JobAssignedDeputy")
+  assignedDeliverables       Deliverable[]          @relation("DeliverableAssignee")
+  shootDeliverables          Deliverable[]          @relation("DeliverableCameraman")
+  editorDeliverables         Deliverable[]          @relation("DeliverableEditor")
+  postDeliverables           Deliverable[]          @relation("DeliverablePublisher")
+  responsibleStages          DeliverableStage[]     @relation("StageResponsibleUser")
+  assignedTasksGiven         TaskAssignment[]       @relation("TaskAssignedBy")
+  assignedTasksReceived      TaskAssignment[]       @relation("TaskAssignedTo")
+  workSubmissions            WorkSubmission[]       @relation("SubmissionSubmittedBy")
+  approvalReviews            ApprovalReview[]       @relation("Reviewer")
+  performanceRatingsGiven    PerformanceRating[]    @relation("RatingGivenBy")
+  performanceRatingsReceived PerformanceRating[]    @relation("RatingReceivedBy")
+  creditLedgerEntries        CreditLedgerEntry[]    @relation("CreditRecipient")
+  assignedCredits            CreditLedgerEntry[]    @relation("CreditAssignedBy")
+  salaryRecords              SalaryRecord[]
+  activityLogs               ActivityLog[]
+  notifications              Notification[]
 
   @@index([departmentId])
   @@index([managerId])
@@ -185,22 +212,26 @@ model User {
 
 // 3. Team
 model Team {
-  id          String   @id @default(cuid())
-  name        String
-  code        String?  @unique
-  description String?  @db.Text
-  isActive    Boolean  @default(true)
+  id           String     @id @default(cuid())
+  name         String
+  code         String?    @unique
+  description  String?    @db.Text
+  isActive     Boolean    @default(true)
 
   departmentId String
   department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  leadId       String?
+  lead         User?      @relation("TeamLeadUser", fields: [leadId], references: [id], onDelete: SetNull)
 
-  memberships TeamMembership[]
-  jobs        Job[]
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  memberships  TeamMembership[]
+  jobs         Job[]
 
   @@index([departmentId])
+  @@index([leadId])
   @@map("teams")
 }
 
@@ -228,10 +259,11 @@ model Job {
   title            String
   code             String?     @unique
   description      String?     @db.Text
+  jobDate          DateTime    @default(now())
   jobType          JobType     @default(CONTENT_CREATION)
   category         String?     // Events, Placement, Meta Ads, Campus Life, etc.
   priority         JobPriority @default(MEDIUM)
-  status           JobStatus   @default(DRAFT)
+  status           JobStatus   @default(ASSIGNED)
 
   // Venue, Organizer, Event info for Branding & Production
   eventDate        DateTime?
@@ -244,9 +276,13 @@ model Job {
   teamId           String?
   team             Team?       @relation(fields: [teamId], references: [id], onDelete: SetNull)
 
-  // Job Creator / Owner
+  // Job Creator (e.g. Main Manager)
   createdById      String
   createdBy        User        @relation("JobOwner", fields: [createdById], references: [id], onDelete: Restrict)
+
+  // Accountable Job Owner / Team Lead
+  ownerId          String?
+  owner            User?       @relation("JobAccountableOwner", fields: [ownerId], references: [id], onDelete: SetNull)
 
   // Deputy Manager Assigned
   assignedDeputyId String?
@@ -263,45 +299,86 @@ model Job {
   @@index([departmentId])
   @@index([teamId])
   @@index([createdById])
+  @@index([ownerId])
   @@index([assignedDeputyId])
   @@index([status])
   @@index([jobType])
+  @@index([jobDate])
   @@map("jobs")
 }
 
 // 6. Deliverable
 model Deliverable {
-  id              String          @id @default(cuid())
-  jobId           String
-  job             Job             @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  id               String                    @id @default(cuid())
+  jobId            String
+  job              Job                       @relation(fields: [jobId], references: [id], onDelete: Cascade)
 
-  title           String
-  description     String?         @db.Text
-  deliverableType DeliverableType @default(PHOTO_POST)
+  title            String
+  description      String?                   @db.Text
+  deliverableType  DeliverableType           @default(PHOTO_POST)
 
-  targetDate      DateTime?
-  completedAt     DateTime?
-  status          StageStatus     @default(NOT_INITIATED)
-  approvalStatus  ApprovalStatus  @default(NOT_INITIATED)
+  assignedToId     String?
+  assignedTo       User?                     @relation("DeliverableAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
 
-  // External Links & Metadata
-  googleDriveUrl  String?         @db.Text
-  rawFootageUrl   String?         @db.Text
-  approvedVideoUrl String?        @db.Text
-  livePostUrl     String?         @db.Text
+  targetDate       DateTime?
+  firstSubmittedAt DateTime?
+  completedAt      DateTime?
 
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  workflowState    WorkflowState             @default(ASSIGNED)
+  deliveryStatus   DeliveryPerformanceStatus @default(PENDING)
+  status           StageStatus               @default(NOT_INITIATED)
+  approvalStatus   ApprovalStatus            @default(NOT_INITIATED)
+  cancellationReason String?                 @db.Text
 
-  stages          DeliverableStage[]
-  tasks           TaskAssignment[]
-  reviews         ApprovalReview[]
-  ratings         PerformanceRating[]
-  creditEntries   CreditLedgerEntry[]
+  // Shoot / Cameraman Tracker
+  shootAssignedToId  String?
+  shootAssignedTo    User?       @relation("DeliverableCameraman", fields: [shootAssignedToId], references: [id], onDelete: SetNull)
+  shootScheduledDate DateTime?
+  shootActualDate    DateTime?
+  shootStatus        StageStatus @default(NOT_INITIATED)
+
+  // Video Editor Tracker
+  editorAssignedToId String?
+  editorAssignedTo   User?       @relation("DeliverableEditor", fields: [editorAssignedToId], references: [id], onDelete: SetNull)
+  editScheduledDate  DateTime?
+  editActualDate     DateTime?
+  editStatus         StageStatus @default(NOT_INITIATED)
+
+  // Social Media Publishing & External Links
+  postAssignedToId   String?
+  postAssignedTo     User?       @relation("DeliverablePublisher", fields: [postAssignedToId], references: [id], onDelete: SetNull)
+  postScheduledDate  DateTime?
+  postActualDate     DateTime?
+  postStatus         StageStatus @default(NOT_INITIATED)
+  googleDriveUrl     String?     @db.Text
+  rawFootageUrl      String?     @db.Text
+  approvedVideoUrl   String?     @db.Text
+  livePostUrl        String?     @db.Text
+
+  // Branding & Production Credits
+  contentCredits     Decimal?    @db.Decimal(10, 2)
+  jobOwnerCredits    Decimal?    @db.Decimal(10, 2)
+  creditsAllocated   Decimal?    @db.Decimal(10, 2)
+
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  stages             DeliverableStage[]
+  tasks              TaskAssignment[]
+  submissions        WorkSubmission[]
+  reviews            ApprovalReview[]
+  ratings            PerformanceRating[]
+  creditEntries      CreditLedgerEntry[]
 
   @@index([jobId])
+  @@index([assignedToId])
+  @@index([shootAssignedToId])
+  @@index([editorAssignedToId])
   @@index([deliverableType])
+  @@index([targetDate])
   @@index([status])
+  @@index([workflowState])
+  @@index([deliveryStatus])
   @@map("deliverables")
 }
 
@@ -341,26 +418,31 @@ model WorkflowStageTemplate {
 
 // 9. DeliverableStage
 model DeliverableStage {
-  id               String         @id @default(cuid())
-  deliverableId    String
-  deliverable      Deliverable    @relation(fields: [deliverableId], references: [id], onDelete: Cascade)
+  id                String         @id @default(cuid())
+  deliverableId     String
+  deliverable       Deliverable    @relation(fields: [deliverableId], references: [id], onDelete: Cascade)
 
-  name             String
-  stageOrder       Int
-  status           StageStatus    @default(NOT_INITIATED)
-  approvalStatus   ApprovalStatus @default(NOT_INITIATED)
+  name              String
+  stageOrder        Int
+  status            StageStatus    @default(NOT_INITIATED)
+  approvalStatus    ApprovalStatus @default(NOT_INITIATED)
 
-  targetDate       DateTime?
-  completedAt      DateTime?
-  driveUrl         String?        @db.Text
+  responsibleUserId String?
+  responsibleUser   User?          @relation("StageResponsibleUser", fields: [responsibleUserId], references: [id], onDelete: SetNull)
 
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+  targetDate        DateTime?
+  completedAt       DateTime?
+  driveUrl          String?        @db.Text
+  notes             String?        @db.Text
 
-  tasks            TaskAssignment[]
-  submissions      WorkSubmission[]
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  tasks             TaskAssignment[]
+  submissions       WorkSubmission[]
 
   @@index([deliverableId, stageOrder])
+  @@index([responsibleUserId])
   @@map("deliverable_stages")
 }
 
@@ -405,39 +487,44 @@ model TaskAssignment {
 
 // 11. WorkSubmission
 model WorkSubmission {
-  id           String            @id @default(cuid())
-  taskId       String
-  task         TaskAssignment    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  id            String            @id @default(cuid())
+  taskId        String?
+  task          TaskAssignment?   @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
-  stageId      String?
-  stage        DeliverableStage? @relation(fields: [stageId], references: [id], onDelete: SetNull)
+  deliverableId String?
+  deliverable   Deliverable?      @relation(fields: [deliverableId], references: [id], onDelete: Cascade)
+
+  stageId       String?
+  stage         DeliverableStage? @relation(fields: [stageId], references: [id], onDelete: SetNull)
 
   submittedById String
-  submittedBy  User              @relation("SubmissionSubmittedBy", fields: [submittedById], references: [id], onDelete: Restrict)
+  submittedBy   User              @relation("SubmissionSubmittedBy", fields: [submittedById], references: [id], onDelete: Restrict)
 
-  version      Int               @default(1)
-  notes        String?           @db.Text
-  submissionUrl String?          @db.Text // Google Drive or cloud link
-  filePath     String?           // Local/Persistent storage relative path
-  fileName     String?
+  version       Int               @default(1)
+  notes         String?           @db.Text
+  submissionUrl String?           @db.Text // Google Drive or external link
+  filePath      String?           // Local/Persistent storage relative path
+  fileName      String?
   fileSizeBytes BigInt?
-  mimeType     String?
+  mimeType      String?
 
-  submittedAt  DateTime          @default(now())
+  submittedAt   DateTime          @default(now())
 
-  reviews      ApprovalReview[]
+  reviews       ApprovalReview[]
 
   @@index([taskId])
+  @@index([deliverableId])
   @@index([stageId])
   @@index([submittedById])
+  @@index([submittedAt])
   @@map("work_submissions")
 }
 
 // 12. ApprovalReview
 model ApprovalReview {
-  id             String         @id @default(cuid())
+  id             String          @id @default(cuid())
   deliverableId  String?
-  deliverable    Deliverable?   @relation(fields: [deliverableId], references: [id], onDelete: Cascade)
+  deliverable    Deliverable?    @relation(fields: [deliverableId], references: [id], onDelete: Cascade)
 
   taskId         String?
   task           TaskAssignment? @relation(fields: [taskId], references: [id], onDelete: SetNull)
@@ -446,13 +533,13 @@ model ApprovalReview {
   submission     WorkSubmission? @relation(fields: [submissionId], references: [id], onDelete: SetNull)
 
   reviewerId     String
-  reviewer       User           @relation("Reviewer", fields: [reviewerId], references: [id], onDelete: Restrict)
+  reviewer       User            @relation("Reviewer", fields: [reviewerId], references: [id], onDelete: Restrict)
 
   status         ApprovalStatus
-  publicFeedback String?        @db.Text // Visible to employee
-  privateNotes   String?        @db.Text // Management only
+  publicFeedback String?         @db.Text // Visible to employee
+  privateNotes   String?         @db.Text // Management only
 
-  reviewedAt     DateTime       @default(now())
+  reviewedAt     DateTime        @default(now())
 
   @@index([deliverableId])
   @@index([taskId])
@@ -511,7 +598,10 @@ model CreditRule {
 model CreditLedgerEntry {
   id            String       @id @default(cuid())
   userId        String
-  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user          User         @relation("CreditRecipient", fields: [userId], references: [id], onDelete: Cascade)
+
+  assignedById  String?
+  assignedBy    User?        @relation("CreditAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
 
   deliverableId String?
   deliverable   Deliverable? @relation(fields: [deliverableId], references: [id], onDelete: SetNull)
@@ -519,12 +609,14 @@ model CreditLedgerEntry {
   creditRuleId  String?
   creditRule    CreditRule?  @relation(fields: [creditRuleId], references: [id], onDelete: SetNull)
 
+  creditType    String?      // CONTENT_CREDITS, JOB_OWNER_CREDITS, etc.
   creditsEarned Decimal      @db.Decimal(10, 2)
   reason        String
   source        String?      // Reference to assignment / job
   awardedAt     DateTime     @default(now())
 
   @@index([userId])
+  @@index([assignedById])
   @@index([deliverableId])
   @@index([creditRuleId])
   @@map("credit_ledger_entries")
@@ -592,4 +684,3 @@ model Notification {
   @@index([userId, isRead])
   @@map("notifications")
 }
-

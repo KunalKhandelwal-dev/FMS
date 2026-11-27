@@ -5,6 +5,7 @@ export const approvalReviewSchema = z.object({
   taskId: z.string().optional().nullable(),
   submissionId: z.string().optional().nullable(),
   status: z.enum(["APPROVED", "REVISION_REQUESTED", "REJECTED"]),
+  stars: z.number().int().min(1).max(5).optional().nullable(),
   publicFeedback: z.string().trim().optional().nullable(),
   privateNotes: z.string().trim().optional().nullable(),
 });
@@ -20,4 +21,3 @@ export const performanceRatingSchema = z.object({
 });
 
 export type PerformanceRatingInput = z.infer<typeof performanceRatingSchema>;
-

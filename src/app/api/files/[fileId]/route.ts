@@ -5,8 +5,10 @@ import { db } from "@/server/db/client";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(request: NextRequest, context: { params: Promise<{ fileId: string }> }) {
-  // 1. Session check - files are private and protected
+export async function GET(
+  _request: NextRequest,
+  context: { params: Promise<{ fileId: string }> }
+) {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
@@ -14,12 +16,16 @@ export async function GET(request: NextRequest, context: { params: Promise<{ fil
 
   const { fileId } = await context.params;
 
-  // 2. Lookup submission metadata
   const submission = await db.workSubmission.findFirst({
     where: {
       OR: [{ id: fileId }, { filePath: { contains: fileId } }],
     },
     include: {
+      deliverable: {
+        include: {
+          job: true,
+        },
+      },
       task: {
         include: {
           deliverable: {
@@ -34,13 +40,17 @@ export async function GET(request: NextRequest, context: { params: Promise<{ fil
     return NextResponse.json({ error: "File not found" }, { status: 404 });
   }
 
-  // 3. Permission check
-  const isSuper = user.role === "MAIN_MANAGER";
-  const isDeputy = submission.task.deliverable.job.assignedDeputyId === user.id;
-  const isSubmitter = submission.submittedById === user.id;
-  const isAssignee = submission.task.assignedToId === user.id;
+  const job = submission.deliverable?.job || submission.task?.deliverable.job;
+  const deliverable = submission.deliverable || submission.task?.deliverable;
 
-  if (!isSuper && !isDeputy && !isSubmitter && !isAssignee) {
+  const isSuper = user.role === "MAIN_MANAGER";
+  const isJobOwner = job?.ownerId === user.id || job?.createdById === user.id;
+  const isDeputy = job?.assignedDeputyId === user.id;
+  const isSubmitter = submission.submittedById === user.id;
+  const isAssignee =
+    deliverable?.assignedToId === user.id || submission.task?.assignedToId === user.id;
+
+  if (!isSuper && !isJobOwner && !isDeputy && !isSubmitter && !isAssignee) {
     return NextResponse.json({ error: "Forbidden: You cannot access this file" }, { status: 403 });
   }
 

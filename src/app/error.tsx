@@ -15,23 +15,22 @@ export default function GlobalError({
   }, [error]);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-[#F8FAFC] px-4">
-      <div className="w-16 h-16 rounded-2xl bg-red-50 border border-red-200 flex items-center justify-center text-red-600 mb-6">
-        <AlertTriangle className="w-8 h-8" />
+    <div className="min-h-screen flex flex-col items-center justify-center bg-[#F7F8FC] px-4">
+      <div className="w-12 h-12 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-center text-[#E11D48] mb-5">
+        <AlertTriangle className="w-6 h-6" />
       </div>
-      <h1 className="text-2xl font-bold text-[#0A1F44] tracking-tight mb-2">
-        System Error Encountered
+      <h1 className="text-xl font-semibold text-[#202638] tracking-tight mb-1.5">
+        Something went wrong
       </h1>
-      <p className="text-slate-600 text-center max-w-md mb-6">
-        An unexpected error occurred while executing this operation. The event has been logged for
-        system administrators.
+      <p className="text-sm text-[#64748B] text-center max-w-md mb-6">
+        An unexpected error occurred while processing this request. Please try again.
       </p>
       <button
         onClick={() => reset()}
-        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#0A1F44] text-white font-medium hover:bg-[#102C5E] transition-colors cursor-pointer"
+        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#4F46E5] text-white text-sm font-medium hover:bg-[#4338CA] transition-colors cursor-pointer"
       >
         <RotateCcw className="w-4 h-4" />
-        Retry Operation
+        Retry
       </button>
     </div>
   );
