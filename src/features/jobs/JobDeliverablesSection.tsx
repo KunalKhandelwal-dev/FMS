@@ -75,21 +75,33 @@ interface EmployeeOption {
   designation: string | null;
 }
 
+function getVisibleStageKeys(deliverableType: string): Array<"shoot" | "edit" | "post"> {
+  if (deliverableType === "LIVE_STORY") return ["post"];
+  if (deliverableType === "PHOTO_POST") return ["shoot", "post"];
+  if (deliverableType === "PHOTOGRAPHY_CLASS") return ["shoot"];
+  return ["shoot", "edit", "post"];
+}
+
 export function JobDeliverablesSection({
   deliverables,
   employees,
   currentUserId,
   canReview,
+  canRate,
   canManageTracker,
 }: {
   deliverables: JobDeliverableItem[];
   employees: EmployeeOption[];
   currentUserId: string;
   canReview: boolean;
+  canRate: boolean;
   canManageTracker: boolean;
 }) {
   const [reviewTarget, setReviewTarget] = useState<JobDeliverableItem | null>(null);
-  const [trackerTarget, setTrackerTarget] = useState<JobDeliverableItem | null>(null);
+  const [trackerTarget, setTrackerTarget] = useState<{
+    deliverable: JobDeliverableItem;
+    stage: "shoot" | "edit" | "post";
+  } | null>(null);
 
   return (
     <div className="space-y-4">
@@ -106,25 +118,102 @@ export function JobDeliverablesSection({
         <div className="divide-y divide-[#E5E7EB]">
           {deliverables.map((d) => {
             const latestSub = d.submissions[0];
-            const isAssignedToStage =
-              d.shootAssignedToId === currentUserId ||
-              d.editorAssignedToId === currentUserId ||
-              d.postAssignedToId === currentUserId;
-            const showTrackerButton = canManageTracker || isAssignedToStage;
+            const isShootAssignee = d.shootAssignedToId === currentUserId;
+            const isEditorAssignee = d.editorAssignedToId === currentUserId;
+            const isPostAssignee = d.postAssignedToId === currentUserId;
+            const visibleKeys = getVisibleStageKeys(d.deliverableType);
+            const hasSubmissionOrOutput =
+              d.submissions.length > 0 ||
+              Boolean(d.rawFootageUrl) ||
+              Boolean(d.approvedVideoUrl) ||
+              Boolean(d.livePostUrl) ||
+              d.workflowState === "SUBMITTED" ||
+              d.workflowState === "UNDER_REVIEW" ||
+              d.workflowState === "APPROVED" ||
+              d.workflowState === "COMPLETED" ||
+              d.workflowState === "PUBLISHED";
+
+            const allStages: Array<{
+              key: "shoot" | "edit" | "post";
+              title: string;
+              icon: typeof Camera;
+              iconClass: string;
+              status: string;
+              assignedName: string | null;
+              scheduledDate: Date | null;
+              actualDate: Date | null;
+              linkUrl: string | null;
+              linkLabel: string;
+              canEditStage: boolean;
+            }> = [
+              {
+                key: "shoot",
+                title:
+                  d.deliverableType === "PHOTO_POST" || d.deliverableType === "PHOTOGRAPHY_CLASS"
+                    ? "1. Photography / Shoot"
+                    : "1. Shoot / Cameraman",
+                icon: Camera,
+                iconClass: "text-[#4F46E5]",
+                status: d.shootStatus,
+                assignedName: d.shootAssignedToName,
+                scheduledDate: d.shootScheduledDate,
+                actualDate: d.shootActualDate,
+                linkUrl: d.rawFootageUrl,
+                linkLabel: "Raw Footage / Photos",
+                canEditStage: canManageTracker || isShootAssignee,
+              },
+              {
+                key: "edit",
+                title: "2. Video Editor",
+                icon: Video,
+                iconClass: "text-[#7C3AED]",
+                status: d.editStatus,
+                assignedName: d.editorAssignedToName,
+                scheduledDate: d.editScheduledDate,
+                actualDate: d.editActualDate,
+                linkUrl: d.approvedVideoUrl,
+                linkLabel: "Approved Video",
+                canEditStage: canManageTracker || isEditorAssignee,
+              },
+              {
+                key: "post",
+                title: visibleKeys.length === 1 ? "1. Social Publishing" : "Social Publishing",
+                icon: Share2,
+                iconClass: "text-[#202638]",
+                status: d.postStatus,
+                assignedName: d.postAssignedToName,
+                scheduledDate: d.postScheduledDate,
+                actualDate: d.postActualDate,
+                linkUrl: d.livePostUrl,
+                linkLabel: "View Live Post",
+                canEditStage: canManageTracker || isPostAssignee,
+              },
+            ];
+
+            const stages = allStages.filter((s) => visibleKeys.includes(s.key));
+
             return (
               <div key={d.id} className="p-5 space-y-4">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                  <div>
-                    <div className="flex items-center gap-2.5 flex-wrap">
-                      <h3 className="text-sm font-semibold text-[#202638]">
-                        {DELIVERABLE_TYPE_LABELS[d.deliverableType] || d.title}
-                      </h3>
-                      <StatusBadge type="workflow" status={d.workflowState} />
-                      <StatusBadge type="delivery" status={d.deliveryStatus} />
-                      <StatusBadge type="approval" status={d.approvalStatus} />
+                <div className="flex flex-col md:flex-row md:items-start justify-between gap-3">
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold text-[#202638]">
+                      {DELIVERABLE_TYPE_LABELS[d.deliverableType] || d.title}
+                    </h3>
+
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs">
+                      <span className="inline-flex items-center gap-1.5 text-[#64748B]">
+                        Workflow: <StatusBadge type="workflow" status={d.workflowState} />
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 text-[#64748B]">
+                        Delivery: <StatusBadge type="delivery" status={d.deliveryStatus} />
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 text-[#64748B]">
+                        Approval: <StatusBadge type="approval" status={d.approvalStatus} />
+                      </span>
                     </div>
-                    <p className="text-xs text-[#64748B] mt-1">
-                      Assignee: <span className="font-medium text-[#202638]">{d.assignedToName}</span>{" "}
+
+                    <p className="text-xs text-[#64748B]">
+                      Owner / Lead: <span className="font-medium text-[#202638]">{d.assignedToName}</span>{" "}
                       • Target Date:{" "}
                       <span className="font-medium text-[#202638]">{formatDate(d.targetDate)}</span>
                       {d.firstSubmittedAt && (
@@ -147,105 +236,84 @@ export function JobDeliverablesSection({
                       </div>
                     )}
 
-                    {showTrackerButton && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setTrackerTarget(d)}
-                      >
-                        <SlidersHorizontal className="w-3.5 h-3.5 mr-1.5" />
-                        {canManageTracker ? "Shoot / Edit Tracker" : "Update My Stage"}
-                      </Button>
-                    )}
-
                     {canReview && (
                       <Button
                         variant="primary"
                         size="sm"
+                        disabled={!hasSubmissionOrOutput}
+                        title={
+                          hasSubmissionOrOutput
+                            ? "Review deliverable"
+                            : "Review & Approve is locked until the assigned person submits work"
+                        }
                         onClick={() => setReviewTarget(d)}
                       >
                         <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
-                        Review &amp; Rate
+                        {!hasSubmissionOrOutput
+                          ? "Awaiting Submission"
+                          : canRate
+                          ? d.latestRating !== null
+                            ? "Review / Edit Rating"
+                            : "Review & Rate"
+                          : "Review / Approve"}
                       </Button>
                     )}
                   </div>
                 </div>
 
-                {/* Shoot / Editor / Publishing Summary Bar */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-                  <div className="p-3 rounded-lg bg-[#F7F8FC] border border-[#E5E7EB]">
-                    <div className="flex items-center gap-1.5 font-semibold text-[#202638] mb-1">
-                      <Camera className="w-3.5 h-3.5 text-[#4F46E5]" />
-                      Shoot / Cameraman
-                    </div>
-                    <p className="text-[#64748B]">
-                      Assigned: {d.shootAssignedToName || "Not assigned"}
-                    </p>
-                    <p className="text-[#64748B]">
-                      Scheduled: {formatDate(d.shootScheduledDate)} • Actual:{" "}
-                      {formatDate(d.shootActualDate)}
-                    </p>
-                    {d.rawFootageUrl && (
-                      <a
-                        href={d.rawFootageUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-[#4F46E5] hover:underline mt-1"
+                {/* Production Stages — One Row Per Stage */}
+                <div className="space-y-2.5 text-xs">
+                  {stages.map((stage) => {
+                    const StageIcon = stage.icon;
+                    return (
+                      <div
+                        key={stage.key}
+                        className="p-3.5 rounded-lg bg-[#F7F8FC] border border-[#E5E7EB] flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                       >
-                        Raw Footage <ExternalLink className="w-3 h-3" />
-                      </a>
-                    )}
-                  </div>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <StageIcon className={`w-3.5 h-3.5 ${stage.iconClass}`} />
+                            <span className="font-semibold text-[#202638]">{stage.title}</span>
+                            <StatusBadge type="stage" status={stage.status} />
+                          </div>
+                          <p className="text-[#64748B]">
+                            Assigned:{" "}
+                            <span className="font-medium text-[#202638]">
+                              {stage.assignedName || "Not assigned"}
+                            </span>{" "}
+                            • Scheduled: {formatDate(stage.scheduledDate)} • Actual:{" "}
+                            {formatDate(stage.actualDate)}
+                          </p>
+                        </div>
 
-                  <div className="p-3 rounded-lg bg-[#F7F8FC] border border-[#E5E7EB]">
-                    <div className="flex items-center gap-1.5 font-semibold text-[#202638] mb-1">
-                      <Video className="w-3.5 h-3.5 text-[#7C3AED]" />
-                      Video Editor
-                    </div>
-                    <p className="text-[#64748B]">
-                      Assigned: {d.editorAssignedToName || "Not assigned"}
-                    </p>
-                    <p className="text-[#64748B]">
-                      Scheduled: {formatDate(d.editScheduledDate)} • Actual:{" "}
-                      {formatDate(d.editActualDate)}
-                    </p>
-                    {d.approvedVideoUrl && (
-                      <a
-                        href={d.approvedVideoUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-[#4F46E5] hover:underline mt-1"
-                      >
-                        Approved Video <ExternalLink className="w-3 h-3" />
-                      </a>
-                    )}
-                  </div>
+                        <div className="flex items-center gap-3 shrink-0">
+                          {stage.linkUrl ? (
+                            <a
+                              href={stage.linkUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-[#4F46E5] font-medium hover:underline"
+                            >
+                              {stage.linkLabel} <ExternalLink className="w-3 h-3" />
+                            </a>
+                          ) : (
+                            <span className="text-slate-400">No link recorded</span>
+                          )}
 
-                  <div className="p-3 rounded-lg bg-[#F7F8FC] border border-[#E5E7EB]">
-                    <div className="flex items-center gap-1.5 font-semibold text-[#202638] mb-1">
-                      <Share2 className="w-3.5 h-3.5 text-[#202638]" />
-                      Social Publishing
-                    </div>
-                    <p className="text-[#64748B]">
-                      Assigned: {d.postAssignedToName || "Not assigned"}
-                    </p>
-                    <p className="text-[#64748B]">
-                      Scheduled: {formatDate(d.postScheduledDate)} • Actual:{" "}
-                      {formatDate(d.postActualDate)}
-                    </p>
-                    {d.livePostUrl ? (
-                      <a
-                        href={d.livePostUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-[#4F46E5] hover:underline mt-1"
-                      >
-                        View Live Post <ExternalLink className="w-3 h-3" />
-                      </a>
-                    ) : (
-                      <p className="text-slate-400 mt-1">No live link recorded</p>
-                    )}
-                  </div>
+                          {stage.canEditStage && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setTrackerTarget({ deliverable: d, stage: stage.key })}
+                            >
+                              <SlidersHorizontal className="w-3.5 h-3.5 mr-1.5" />
+                              {canManageTracker ? "Assign / Edit" : "Update Stage"}
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
 
                 {/* Submission History & Reviews */}
@@ -355,13 +423,16 @@ export function JobDeliverablesSection({
             DELIVERABLE_TYPE_LABELS[reviewTarget.deliverableType] || reviewTarget.title
           }
           submissionId={reviewTarget.submissions[0]?.id}
+          canRate={canRate}
+          existingRating={reviewTarget.latestRating}
           onClose={() => setReviewTarget(null)}
         />
       )}
 
       {trackerTarget && (
         <DeliverableTrackerEditor
-          deliverable={trackerTarget}
+          deliverable={trackerTarget.deliverable}
+          initialStage={trackerTarget.stage}
           employees={employees}
           currentUserId={currentUserId}
           canManageAssignments={canManageTracker}

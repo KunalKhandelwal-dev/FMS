@@ -46,7 +46,6 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "task:submit",
     "review:approve",
     "review:request_revision",
-    "rating:create",
     "analytics:team_view",
   ],
   TEAM_LEAD: ["task:create", "task:submit", "review:approve", "review:request_revision"],

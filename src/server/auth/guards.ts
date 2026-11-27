@@ -108,7 +108,9 @@ export async function canAccessJob(user: SessionUser, jobId: string): Promise<bo
         { shootAssignedToId: user.id },
         { editorAssignedToId: user.id },
         { postAssignedToId: user.id },
-        { stages: { some: { responsibleUserId: user.id } } },
+        { proofreadAssignedToId: user.id },
+        { fitterAssignedToId: user.id },
+        { stages: { some: { OR: [{ responsibleUserId: user.id }, { assignedById: user.id }] } } },
         { tasks: { some: { assignedToId: user.id } } },
       ],
     },
@@ -134,6 +136,8 @@ export async function canAccessDeliverable(
       shootAssignedToId: true,
       editorAssignedToId: true,
       postAssignedToId: true,
+      proofreadAssignedToId: true,
+      fitterAssignedToId: true,
       job: {
         select: {
           ownerId: true,
@@ -142,7 +146,7 @@ export async function canAccessDeliverable(
         },
       },
       stages: {
-        select: { responsibleUserId: true },
+        select: { responsibleUserId: true, assignedById: true },
       },
       tasks: {
         select: { assignedToId: true },
@@ -157,6 +161,8 @@ export async function canAccessDeliverable(
     deliverable.shootAssignedToId === user.id ||
     deliverable.editorAssignedToId === user.id ||
     deliverable.postAssignedToId === user.id ||
+    deliverable.proofreadAssignedToId === user.id ||
+    deliverable.fitterAssignedToId === user.id ||
     deliverable.job.ownerId === user.id ||
     deliverable.job.assignedDeputyId === user.id ||
     deliverable.job.createdById === user.id
@@ -164,7 +170,7 @@ export async function canAccessDeliverable(
     return true;
   }
 
-  if (deliverable.stages.some((s) => s.responsibleUserId === user.id)) {
+  if (deliverable.stages.some((s) => s.responsibleUserId === user.id || s.assignedById === user.id)) {
     return true;
   }
 
@@ -203,7 +209,9 @@ export async function canAccessTask(user: SessionUser, taskId: string): Promise<
 }
 
 /**
- * Verifies if user can manage another employee.
+ * Verifies if user can manage another employee's profile/reporting.
+ * Note: Secondary delegation (e.g. Ruhi assigning tasks to Hardik) or
+ * independent proofreading (Mandeep on Navneet's team) does NOT grant profile management.
  */
 export async function canManageEmployee(user: SessionUser, targetUserId: string): Promise<boolean> {
   if (user.role === UserRole.MAIN_MANAGER) return true;
@@ -215,6 +223,34 @@ export async function canManageEmployee(user: SessionUser, targetUserId: string)
   });
 
   return target?.managerId === user.id;
+}
+
+/**
+ * Verifies if an authorized supervisor/lead can assign tasks to a target user.
+ * Supports both primary supervisor (managerId) and secondary incharge (secondaryManagerId).
+ */
+export async function canAssignTaskToUser(user: SessionUser, targetUserId: string): Promise<boolean> {
+  if (user.role === UserRole.MAIN_MANAGER) return true;
+
+  const target = await db.user.findUnique({
+    where: { id: targetUserId },
+    select: {
+      status: true,
+      managerId: true,
+      secondaryManagerId: true,
+      teamMemberships: {
+        where: { status: "ACTIVE" },
+        select: { membershipType: true, team: { select: { leadId: true } } },
+      },
+    },
+  });
+
+  if (!target || target.status !== UserStatus.ACTIVE) return false;
+  if (target.managerId === user.id || target.secondaryManagerId === user.id) return true;
+
+  return target.teamMemberships.some(
+    (m) => m.team.leadId === user.id && m.membershipType !== "REVIEWER"
+  );
 }
 
 /**

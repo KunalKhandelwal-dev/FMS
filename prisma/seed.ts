@@ -10,6 +10,21 @@ import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
+interface DemoStaffSeed {
+  email: string;
+  fullName: string;
+  designation: string;
+  role: UserRole;
+  code: string;
+  primaryTeamCode: "TEAM-BRANDING" | "TEAM-ONLINE" | "TEAM-CONTENT";
+  teamRole: TeamRole;
+  membershipType?: "PRIMARY" | "SHARED" | "REVIEWER";
+  isPrimaryTeam?: boolean;
+  secondaryTeamCode?: "TEAM-BRANDING" | "TEAM-ONLINE" | "TEAM-CONTENT";
+  reportsToEmail?: string;
+  secondaryReportsToEmail?: string;
+}
+
 async function main() {
   console.log("Starting FMS Database Seeding...");
 
@@ -81,7 +96,7 @@ async function main() {
             name: "Shoot / Raw Footage",
             stageOrder: 1,
             defaultTargetDays: 1,
-            description: "Cameraman shoot scheduled and raw footage uploaded",
+            description: "Cinematographer shoot scheduled and raw footage uploaded",
             requiresApproval: false,
           },
           {
@@ -95,7 +110,7 @@ async function main() {
             name: "Approval & Review",
             stageOrder: 3,
             defaultTargetDays: 1,
-            description: "Manager/Deputy review and quality sign-off",
+            description: "Team Lead and Main Manager review and quality sign-off",
             requiresApproval: true,
           },
           {
@@ -118,7 +133,7 @@ async function main() {
       name: "Standard Branding & Production Workflow",
       jobType: JobType.BRANDING_PRODUCTION,
       description:
-        "5-stage pipeline for event mockups, approved designs, print orders, supply & install, and pack-ups",
+        "5-stage pipeline for event mockups, Mandeep proofreading, Navneet & Deepak approvals, and venue installation",
       isActive: true,
       stages: {
         create: [
@@ -126,36 +141,36 @@ async function main() {
             name: "Content / Mockup",
             stageOrder: 1,
             defaultTargetDays: 1,
-            description: "Initial content and design mockup creation",
+            description: "Initial design mockup creation by Designer",
+            requiresApproval: true,
+          },
+          {
+            name: "Content Proofreading",
+            stageOrder: 2,
+            defaultTargetDays: 1,
+            description: "Independent proofreading and correction check by Mandeep",
             requiresApproval: true,
           },
           {
             name: "Approved Design",
-            stageOrder: 2,
+            stageOrder: 3,
             defaultTargetDays: 2,
-            description: "Final design sign-off by job owner",
+            description: "Navneet and Deepak final design sign-off",
             requiresApproval: true,
           },
           {
             name: "Print Orders, Mailing Design, DBMS",
-            stageOrder: 3,
+            stageOrder: 4,
             defaultTargetDays: 3,
             description: "Print vendor coordination and database dispatch",
             requiresApproval: false,
           },
           {
             name: "Supply & Install",
-            stageOrder: 4,
-            defaultTargetDays: 4,
-            description: "On-site delivery and physical installation at venue",
-            requiresApproval: false,
-          },
-          {
-            name: "Pack-ups",
             stageOrder: 5,
             defaultTargetDays: 4,
-            description: "Post-event packup, inventory return, and credit allocation",
-            requiresApproval: true,
+            description: "On-site delivery and physical installation at venue by Fitter",
+            requiresApproval: false,
           },
         ],
       },
@@ -203,105 +218,148 @@ async function main() {
     }
   }
 
-  // 5. Development-Only Demo Data (Explicit opt-in via SEED_DEMO_DATA=true, never in production)
+  // 5. Development-Only Organizational Data (Explicit opt-in via SEED_DEMO_DATA=true, never in production)
   if (process.env.NODE_ENV !== "production" && process.env.SEED_DEMO_DATA === "true") {
-    const demoPassword = process.env.DEV_DEMO_PASSWORD || "DemoPass123!";
-    const demoHash = await bcrypt.hash(demoPassword, 10);
+    const demoPassword = process.env.DEV_DEMO_PASSWORD;
+    if (!demoPassword) {
+      console.log(
+        "Notice: DEV_DEMO_PASSWORD is not set. Skipping new demo staff password creation."
+      );
+      return;
+    }
 
-    const contentTeam = await prisma.team.upsert({
-      where: { code: "TEAM-CONTENT" },
-      update: {},
-      create: {
-        name: "Content Creation Team",
-        code: "TEAM-CONTENT",
-        description: "Development demo team for shoot, video edit, and social content",
-        departmentId: brandingDept.id,
-      },
-    });
+    const demoHash = await bcrypt.hash(demoPassword, 12);
 
     const brandingTeam = await prisma.team.upsert({
       where: { code: "TEAM-BRANDING" },
-      update: {},
+      update: {
+        name: "Offline Branding and Production Team",
+        description: "Offline design, proofreading coordination, print, and venue installation",
+        isActive: true,
+      },
       create: {
-        name: "Branding & Production Team",
+        name: "Offline Branding and Production Team",
         code: "TEAM-BRANDING",
-        description: "Development demo team for event mockups, print, and installations",
+        description: "Offline design, proofreading coordination, print, and venue installation",
         departmentId: brandingDept.id,
       },
     });
 
-    const demoEmployees = [
+    const onlineTeam = await prisma.team.upsert({
+      where: { code: "TEAM-ONLINE" },
+      update: {
+        name: "Online Production Team",
+        description: "Online video editing, social media publishing, and photography",
+        isActive: true,
+      },
+      create: {
+        name: "Online Production Team",
+        code: "TEAM-ONLINE",
+        description: "Online video editing, social media publishing, and photography",
+        departmentId: brandingDept.id,
+      },
+    });
+
+    const contentTeam = await prisma.team.upsert({
+      where: { code: "TEAM-CONTENT" },
+      update: {
+        name: "Content Strategy and Video Team",
+        description: "Content strategy, anchoring, cinematography, and video editing",
+        isActive: true,
+      },
+      create: {
+        name: "Content Strategy and Video Team",
+        code: "TEAM-CONTENT",
+        description: "Content strategy, anchoring, cinematography, and video editing",
+        departmentId: brandingDept.id,
+      },
+    });
+
+    const teamByCode = {
+      "TEAM-BRANDING": brandingTeam.id,
+      "TEAM-ONLINE": onlineTeam.id,
+      "TEAM-CONTENT": contentTeam.id,
+    } as const;
+
+    // Ordered so supervisors are upserted before their direct reports
+    const staffList: DemoStaffSeed[] = [
+      {
+        email: "navneet.demo@fms.local",
+        fullName: "Navneet",
+        designation: "Offline Branding Team Head",
+        role: UserRole.DEPUTY_MANAGER,
+        code: "DEV-EMP-05",
+        primaryTeamCode: "TEAM-BRANDING",
+        teamRole: TeamRole.LEAD,
+      },
       {
         email: "yash.demo@fms.local",
-        fullName: "Yash",
-        designation: "Team Lead — Content Creation",
-        role: UserRole.TEAM_LEAD,
+        fullName: "Yashpreet",
+        designation: "Deputy Branding Manager — Online Production",
+        role: UserRole.DEPUTY_MANAGER,
         code: "DEV-EMP-01",
-        teamId: contentTeam.id,
+        primaryTeamCode: "TEAM-ONLINE",
         teamRole: TeamRole.LEAD,
       },
       {
         email: "ruhi.demo@fms.local",
         fullName: "Ruhi",
-        designation: "Team Lead — Content Creation",
+        designation: "Anchor and Content Strategist",
         role: UserRole.TEAM_LEAD,
         code: "DEV-EMP-02",
-        teamId: contentTeam.id,
+        primaryTeamCode: "TEAM-CONTENT",
         teamRole: TeamRole.LEAD,
-      },
-      {
-        email: "arjun.demo@fms.local",
-        fullName: "Arjun",
-        designation: "Cameraman",
-        role: UserRole.EMPLOYEE,
-        code: "DEV-EMP-03",
-        teamId: contentTeam.id,
-        teamRole: TeamRole.SPECIALIST,
-      },
-      {
-        email: "rohit.demo@fms.local",
-        fullName: "Rohit",
-        designation: "Video Editor",
-        role: UserRole.EMPLOYEE,
-        code: "DEV-EMP-04",
-        teamId: contentTeam.id,
-        teamRole: TeamRole.SPECIALIST,
-      },
-      {
-        email: "navneet.demo@fms.local",
-        fullName: "Navneet",
-        designation: "Branding Coordinator",
-        role: UserRole.DEPUTY_MANAGER,
-        code: "DEV-EMP-05",
-        teamId: brandingTeam.id,
-        teamRole: TeamRole.LEAD,
-      },
-      {
-        email: "vishal.demo@fms.local",
-        fullName: "Vishal",
-        designation: "Production Executive",
-        role: UserRole.EMPLOYEE,
-        code: "DEV-EMP-06",
-        teamId: brandingTeam.id,
-        teamRole: TeamRole.MEMBER,
-      },
-      {
-        email: "rajesh.demo@fms.local",
-        fullName: "Rajesh",
-        designation: "Production Executive",
-        role: UserRole.EMPLOYEE,
-        code: "DEV-EMP-07",
-        teamId: brandingTeam.id,
-        teamRole: TeamRole.MEMBER,
       },
       {
         email: "mandeep.demo@fms.local",
         fullName: "Mandeep",
-        designation: "Content & Mockup Designer",
+        designation: "Content Writer and Proofreader",
         role: UserRole.EMPLOYEE,
         code: "DEV-EMP-08",
-        teamId: brandingTeam.id,
+        primaryTeamCode: "TEAM-BRANDING",
         teamRole: TeamRole.SPECIALIST,
+        membershipType: "REVIEWER",
+        isPrimaryTeam: false,
+      },
+      {
+        email: "vishal.demo@fms.local",
+        fullName: "Vishal Tavni",
+        designation: "Designer",
+        role: UserRole.EMPLOYEE,
+        code: "DEV-EMP-06",
+        primaryTeamCode: "TEAM-BRANDING",
+        teamRole: TeamRole.SPECIALIST,
+        reportsToEmail: "navneet.demo@fms.local",
+      },
+      {
+        email: "rajesh.demo@fms.local",
+        fullName: "Rajesh",
+        designation: "Designer",
+        role: UserRole.EMPLOYEE,
+        code: "DEV-EMP-07",
+        primaryTeamCode: "TEAM-BRANDING",
+        teamRole: TeamRole.SPECIALIST,
+        reportsToEmail: "navneet.demo@fms.local",
+      },
+      {
+        email: "ankit.demo@fms.local",
+        fullName: "Ankit",
+        designation: "Fitter",
+        role: UserRole.EMPLOYEE,
+        code: "DEV-EMP-10",
+        primaryTeamCode: "TEAM-BRANDING",
+        teamRole: TeamRole.MEMBER,
+        reportsToEmail: "navneet.demo@fms.local",
+      },
+      {
+        email: "anup.demo@fms.local",
+        fullName: "Anup",
+        designation: "Fitter",
+        role: UserRole.EMPLOYEE,
+        code: "DEV-EMP-11",
+        primaryTeamCode: "TEAM-BRANDING",
+        teamRole: TeamRole.MEMBER,
+        reportsToEmail: "navneet.demo@fms.local",
       },
       {
         email: "kajal.demo@fms.local",
@@ -309,26 +367,76 @@ async function main() {
         designation: "Social Media Executive",
         role: UserRole.EMPLOYEE,
         code: "DEV-EMP-09",
-        teamId: contentTeam.id,
+        primaryTeamCode: "TEAM-ONLINE",
         teamRole: TeamRole.SPECIALIST,
         reportsToEmail: "yash.demo@fms.local",
+      },
+      {
+        email: "aashish.demo@fms.local",
+        fullName: "Aashish",
+        designation: "Video Editor",
+        role: UserRole.EMPLOYEE,
+        code: "DEV-EMP-12",
+        primaryTeamCode: "TEAM-ONLINE",
+        teamRole: TeamRole.SPECIALIST,
+        reportsToEmail: "yash.demo@fms.local",
+      },
+      {
+        email: "hardik.demo@fms.local",
+        fullName: "Hardik",
+        designation: "Photographer",
+        role: UserRole.EMPLOYEE,
+        code: "DEV-EMP-13",
+        primaryTeamCode: "TEAM-ONLINE",
+        teamRole: TeamRole.SPECIALIST,
+        membershipType: "PRIMARY",
+        isPrimaryTeam: true,
+        secondaryTeamCode: "TEAM-CONTENT",
+        reportsToEmail: "yash.demo@fms.local",
+        secondaryReportsToEmail: "ruhi.demo@fms.local",
+      },
+      {
+        email: "sarvjeet.demo@fms.local",
+        fullName: "Sarvjeet",
+        designation: "Cinematographer",
+        role: UserRole.EMPLOYEE,
+        code: "DEV-EMP-14",
+        primaryTeamCode: "TEAM-CONTENT",
+        teamRole: TeamRole.SPECIALIST,
+        reportsToEmail: "ruhi.demo@fms.local",
+      },
+      {
+        email: "vishaltyagi.demo@fms.local",
+        fullName: "Vishal Tyagi",
+        designation: "Video Editor",
+        role: UserRole.EMPLOYEE,
+        code: "DEV-EMP-15",
+        primaryTeamCode: "TEAM-CONTENT",
+        teamRole: TeamRole.SPECIALIST,
+        reportsToEmail: "ruhi.demo@fms.local",
       },
     ];
 
     const seededIdsByEmail = new Map<string, string>();
 
-    for (const emp of demoEmployees) {
+    for (const emp of staffList) {
       const resolvedManagerId =
         (emp.reportsToEmail ? seededIdsByEmail.get(emp.reportsToEmail) : undefined) ??
         mainManagerId;
+      const resolvedSecondaryManagerId = emp.secondaryReportsToEmail
+        ? seededIdsByEmail.get(emp.secondaryReportsToEmail) ?? null
+        : null;
 
+      // Never overwrite passwordHash on existing users
       const user = await prisma.user.upsert({
         where: { email: emp.email },
         update: {
           fullName: emp.fullName,
           designation: emp.designation,
           role: emp.role,
+          status: UserStatus.ACTIVE,
           managerId: resolvedManagerId,
+          secondaryManagerId: resolvedSecondaryManagerId,
           departmentId: brandingDept.id,
         },
         create: {
@@ -340,20 +448,86 @@ async function main() {
           status: UserStatus.ACTIVE,
           employeeCode: emp.code,
           managerId: resolvedManagerId,
+          secondaryManagerId: resolvedSecondaryManagerId,
           departmentId: brandingDept.id,
         },
       });
 
       seededIdsByEmail.set(emp.email, user.id);
 
+      const primaryTeamId = teamByCode[emp.primaryTeamCode];
       await prisma.teamMembership.upsert({
-        where: { userId_teamId: { userId: user.id, teamId: emp.teamId } },
-        update: { teamRole: emp.teamRole },
-        create: { userId: user.id, teamId: emp.teamId, teamRole: emp.teamRole },
+        where: { userId_teamId: { userId: user.id, teamId: primaryTeamId } },
+        update: {
+          teamRole: emp.teamRole,
+          membershipType: emp.membershipType ?? "PRIMARY",
+          isPrimary: emp.isPrimaryTeam ?? true,
+          status: "ACTIVE",
+        },
+        create: {
+          userId: user.id,
+          teamId: primaryTeamId,
+          teamRole: emp.teamRole,
+          membershipType: emp.membershipType ?? "PRIMARY",
+          isPrimary: emp.isPrimaryTeam ?? true,
+          status: "ACTIVE",
+        },
+      });
+
+      if (emp.secondaryTeamCode) {
+        const secondaryTeamId = teamByCode[emp.secondaryTeamCode];
+        await prisma.teamMembership.upsert({
+          where: { userId_teamId: { userId: user.id, teamId: secondaryTeamId } },
+          update: {
+            teamRole: TeamRole.SPECIALIST,
+            membershipType: "SHARED",
+            isPrimary: false,
+            status: "ACTIVE",
+          },
+          create: {
+            userId: user.id,
+            teamId: secondaryTeamId,
+            teamRole: TeamRole.SPECIALIST,
+            membershipType: "SHARED",
+            isPrimary: false,
+            status: "ACTIVE",
+          },
+        });
+      }
+    }
+
+    // Set team heads on the 3 teams
+    await prisma.team.update({
+      where: { id: brandingTeam.id },
+      data: { leadId: seededIdsByEmail.get("navneet.demo@fms.local") ?? null },
+    });
+    await prisma.team.update({
+      where: { id: onlineTeam.id },
+      data: { leadId: seededIdsByEmail.get("yash.demo@fms.local") ?? null },
+    });
+    await prisma.team.update({
+      where: { id: contentTeam.id },
+      data: { leadId: seededIdsByEmail.get("ruhi.demo@fms.local") ?? null },
+    });
+
+    // Deactivate dummy accounts (Arjun & Rohit) while preserving historical job/submission FKs
+    const dummyUsers = await prisma.user.findMany({
+      where: { email: { in: ["arjun.demo@fms.local", "rohit.demo@fms.local"] } },
+      select: { id: true },
+    });
+    if (dummyUsers.length > 0) {
+      const dummyIds = dummyUsers.map((u) => u.id);
+      await prisma.user.updateMany({
+        where: { id: { in: dummyIds } },
+        data: { status: UserStatus.INACTIVE },
+      });
+      await prisma.teamMembership.updateMany({
+        where: { userId: { in: dummyIds } },
+        data: { status: "INACTIVE", leftAt: new Date() },
       });
     }
 
-    console.log("Seeded development-only demo teams and staff accounts.");
+    console.log("Seeded Phase 3 organizational teams and staff accounts.");
   }
 
   console.log("Seeding completed successfully.");

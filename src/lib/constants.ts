@@ -68,12 +68,15 @@ export const DELIVERABLE_TYPE_LABELS: Record<string, string> = {
 };
 
 export const WORKFLOW_STATE_LABELS: Record<string, { label: string; color: string }> = {
+  NOT_STARTED: { label: "Not Started", color: "bg-slate-100 text-slate-700 border-slate-300" },
   ASSIGNED: { label: "Pending", color: "bg-indigo-50 text-indigo-700 border-indigo-200" },
   IN_PROGRESS: { label: "In Progress", color: "bg-violet-50 text-violet-700 border-violet-200" },
   SUBMITTED: { label: "Awaiting Review", color: "bg-indigo-50 text-indigo-700 border-indigo-200" },
   UNDER_REVIEW: { label: "Under Review", color: "bg-violet-50 text-violet-700 border-violet-200" },
   REVISION_REQUESTED: { label: "Asked for revision", color: "bg-violet-50 text-violet-700 border-violet-200" },
   APPROVED: { label: "Approved", color: "bg-blue-50 text-blue-700 border-blue-200" },
+  COMPLETED: { label: "Completed", color: "bg-blue-50 text-blue-700 border-blue-200" },
+  PUBLISHED: { label: "Published", color: "bg-indigo-50 text-indigo-700 border-indigo-200" },
   CANCELLED: { label: "Cancelled", color: "bg-gray-100 text-gray-600 border-gray-300" },
 };
 

@@ -77,12 +77,15 @@ enum DeliverableType {
 }
 
 enum WorkflowState {
+  NOT_STARTED
   ASSIGNED
   IN_PROGRESS
   SUBMITTED
   UNDER_REVIEW
   REVISION_REQUESTED
   APPROVED
+  COMPLETED
+  PUBLISHED
   CANCELLED
 }
 
@@ -173,9 +176,14 @@ model User {
   department     Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
 
   // Self-referencing reporting hierarchy
-  managerId      String?
-  manager        User?      @relation("ReportingHierarchy", fields: [managerId], references: [id], onDelete: SetNull)
-  subordinates   User[]     @relation("ReportingHierarchy")
+  managerId          String?
+  manager            User?      @relation("ReportingHierarchy", fields: [managerId], references: [id], onDelete: SetNull)
+  subordinates       User[]     @relation("ReportingHierarchy")
+
+  // Secondary / additional incharge supervisor (e.g. Hardik: primary Yashpreet, secondary Ruhi)
+  secondaryManagerId    String?
+  secondaryManager      User?      @relation("SecondaryReportingHierarchy", fields: [secondaryManagerId], references: [id], onDelete: SetNull)
+  secondarySubordinates User[]     @relation("SecondaryReportingHierarchy")
 
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
@@ -190,7 +198,10 @@ model User {
   shootDeliverables          Deliverable[]          @relation("DeliverableCameraman")
   editorDeliverables         Deliverable[]          @relation("DeliverableEditor")
   postDeliverables           Deliverable[]          @relation("DeliverablePublisher")
+  proofreadDeliverables      Deliverable[]          @relation("DeliverableProofreader")
+  installDeliverables        Deliverable[]          @relation("DeliverableFitter")
   responsibleStages          DeliverableStage[]     @relation("StageResponsibleUser")
+  assignedStagesGiven        DeliverableStage[]     @relation("StageAssignedBy")
   assignedTasksGiven         TaskAssignment[]       @relation("TaskAssignedBy")
   assignedTasksReceived      TaskAssignment[]       @relation("TaskAssignedTo")
   workSubmissions            WorkSubmission[]       @relation("SubmissionSubmittedBy")
@@ -237,12 +248,15 @@ model Team {
 
 // 4. TeamMembership
 model TeamMembership {
-  id        String   @id @default(cuid())
-  userId    String
-  teamId    String
-  teamRole  TeamRole @default(MEMBER)
-  joinedAt  DateTime @default(now())
-  leftAt    DateTime?
+  id             String   @id @default(cuid())
+  userId         String
+  teamId         String
+  teamRole       TeamRole @default(MEMBER)
+  membershipType String   @default("PRIMARY") // PRIMARY, SHARED, REVIEWER
+  isPrimary      Boolean  @default(true)
+  status         String   @default("ACTIVE")  // ACTIVE, INACTIVE
+  joinedAt       DateTime @default(now())
+  leftAt         DateTime?
 
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
@@ -350,10 +364,25 @@ model Deliverable {
   postScheduledDate  DateTime?
   postActualDate     DateTime?
   postStatus         StageStatus @default(NOT_INITIATED)
+  socialPlatform     String?
   googleDriveUrl     String?     @db.Text
   rawFootageUrl      String?     @db.Text
   approvedVideoUrl   String?     @db.Text
   livePostUrl        String?     @db.Text
+
+  // Workflow & Offline Design / Proofreading / Installation Tracker
+  workflowType         String?     // OFFLINE_DESIGN, RUHI_VIDEO, YASHPREET_VIDEO, PHOTOGRAPHY, CINEMATOGRAPHY, SOCIAL_PUBLISHING, INSTALLATION
+  proofreadAssignedToId String?
+  proofreadAssignedTo   User?      @relation("DeliverableProofreader", fields: [proofreadAssignedToId], references: [id], onDelete: SetNull)
+  proofreadStatus      ApprovalStatus @default(NOT_INITIATED)
+  proofreadCompletedAt DateTime?
+
+  fitterAssignedToId   String?
+  fitterAssignedTo     User?       @relation("DeliverableFitter", fields: [fitterAssignedToId], references: [id], onDelete: SetNull)
+  installScheduledDate DateTime?
+  installActualDate    DateTime?
+  installStatus        StageStatus @default(NOT_INITIATED)
+  installProofUrl      String?     @db.Text
 
   // Branding & Production Credits
   contentCredits     Decimal?    @db.Decimal(10, 2)
@@ -423,12 +452,17 @@ model DeliverableStage {
   deliverable       Deliverable    @relation(fields: [deliverableId], references: [id], onDelete: Cascade)
 
   name              String
+  stageKey          String?
   stageOrder        Int
+  requiresApproval  Boolean        @default(true)
   status            StageStatus    @default(NOT_INITIATED)
   approvalStatus    ApprovalStatus @default(NOT_INITIATED)
 
   responsibleUserId String?
   responsibleUser   User?          @relation("StageResponsibleUser", fields: [responsibleUserId], references: [id], onDelete: SetNull)
+
+  assignedById      String?
+  assignedBy        User?          @relation("StageAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
 
   targetDate        DateTime?
   completedAt       DateTime?
@@ -532,10 +566,13 @@ model ApprovalReview {
   submissionId   String?
   submission     WorkSubmission? @relation(fields: [submissionId], references: [id], onDelete: SetNull)
 
+  stageId        String?
+
   reviewerId     String
   reviewer       User            @relation("Reviewer", fields: [reviewerId], references: [id], onDelete: Restrict)
 
   status         ApprovalStatus
+  previousStatus ApprovalStatus?
   publicFeedback String?         @db.Text // Visible to employee
   privateNotes   String?         @db.Text // Management only
 

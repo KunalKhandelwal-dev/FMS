@@ -18,6 +18,7 @@ interface DeliverableTrackerProps {
   deliverable: {
     id: string;
     title: string;
+    deliverableType: string;
     assignedToId: string | null;
     targetDate: Date | null;
     shootAssignedToId: string | null;
@@ -37,6 +38,7 @@ interface DeliverableTrackerProps {
     livePostUrl: string | null;
   };
   employees: EmployeeOption[];
+  initialStage: "shoot" | "edit" | "post";
   currentUserId: string;
   canManageAssignments: boolean;
   onClose: () => void;
@@ -54,6 +56,7 @@ const TRACKER_STATUSES = [
 export function DeliverableTrackerEditor({
   deliverable,
   employees,
+  initialStage,
   currentUserId,
   canManageAssignments,
   onClose,
@@ -61,10 +64,59 @@ export function DeliverableTrackerEditor({
   const router = useRouter();
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeStage, setActiveStage] = useState<"shoot" | "edit" | "post">(initialStage);
 
   const isShootAssignee = deliverable.shootAssignedToId === currentUserId;
   const isEditorAssignee = deliverable.editorAssignedToId === currentUserId;
   const isPostAssignee = deliverable.postAssignedToId === currentUserId;
+
+  const isPhotoOnly =
+    deliverable.deliverableType === "PHOTO_POST" ||
+    deliverable.deliverableType === "PHOTOGRAPHY_CLASS";
+  const isLiveStory = deliverable.deliverableType === "LIVE_STORY";
+
+  const visibleStageKeys: Array<"shoot" | "edit" | "post"> = isLiveStory
+    ? ["post"]
+    : deliverable.deliverableType === "PHOTOGRAPHY_CLASS"
+    ? ["shoot"]
+    : isPhotoOnly
+    ? ["shoot", "post"]
+    : ["shoot", "edit", "post"];
+
+  const shootEmployees = (() => {
+    const filtered = employees.filter((e) => {
+      const d = (e.designation || "").toLowerCase();
+      if (isPhotoOnly) return d.includes("photographer");
+      return d.includes("cinematographer") || d.includes("photographer");
+    });
+    return filtered.length > 0 ? filtered : employees;
+  })();
+
+  const editorEmployees = (() => {
+    const filtered = employees.filter((e) =>
+      (e.designation || "").toLowerCase().includes("editor")
+    );
+    return filtered.length > 0 ? filtered : employees;
+  })();
+
+  const publisherEmployees = (() => {
+    const filtered = employees.filter((e) =>
+      (e.designation || "").toLowerCase().includes("social")
+    );
+    return filtered.length > 0 ? filtered : employees;
+  })();
+
+  const availableStages: Array<{ key: "shoot" | "edit" | "post"; label: string }> = [
+    ...(visibleStageKeys.includes("shoot") && (canManageAssignments || isShootAssignee)
+      ? [{ key: "shoot" as const, label: isPhotoOnly ? "Photography" : "1. Shoot / Cameraman" }]
+      : []),
+    ...(visibleStageKeys.includes("edit") && (canManageAssignments || isEditorAssignee)
+      ? [{ key: "edit" as const, label: "2. Video Editor" }]
+      : []),
+    ...(visibleStageKeys.includes("post") && (canManageAssignments || isPostAssignee)
+      ? [{ key: "post" as const, label: "Social Publishing" }]
+      : []),
+  ];
 
   const [shootAssignedToId, setShootAssignedToId] = useState(deliverable.shootAssignedToId || "");
   const [shootScheduledDate, setShootScheduledDate] = useState(
@@ -107,48 +159,55 @@ export function DeliverableTrackerEditor({
       deliverableId: deliverable.id,
     };
 
-    if (canManageAssignments) {
-      payload.shootAssignedToId = shootAssignedToId || null;
-      payload.shootScheduledDate = shootScheduledDate
-        ? new Date(`${shootScheduledDate}T12:00:00+05:30`)
-        : null;
-      payload.shootStatus = shootStatus as (typeof TRACKER_STATUSES)[number]["value"];
-
-      payload.editorAssignedToId = editorAssignedToId || null;
-      payload.editScheduledDate = editScheduledDate
-        ? new Date(`${editScheduledDate}T12:00:00+05:30`)
-        : null;
-      payload.editStatus = editStatus as (typeof TRACKER_STATUSES)[number]["value"];
-
-      payload.postAssignedToId = postAssignedToId || null;
-      payload.postScheduledDate = postScheduledDate
-        ? new Date(`${postScheduledDate}T12:00:00+05:30`)
-        : null;
-      payload.postStatus = postStatus as (typeof TRACKER_STATUSES)[number]["value"];
+    if (activeStage === "shoot") {
+      if (canManageAssignments) {
+        payload.shootAssignedToId = shootAssignedToId || null;
+        payload.shootScheduledDate = shootScheduledDate
+          ? new Date(`${shootScheduledDate}T12:00:00+05:30`)
+          : null;
+        payload.shootStatus = shootStatus as (typeof TRACKER_STATUSES)[number]["value"];
+      }
+      if (isShootAssignee) {
+        payload.shootActualDate = shootActualDate
+          ? new Date(`${shootActualDate}T12:00:00+05:30`)
+          : null;
+        payload.shootStatus = shootStatus as (typeof TRACKER_STATUSES)[number]["value"];
+        payload.rawFootageUrl = rawFootageUrl.trim() || null;
+      }
     }
 
-    if (isShootAssignee) {
-      payload.shootActualDate = shootActualDate
-        ? new Date(`${shootActualDate}T12:00:00+05:30`)
-        : null;
-      payload.shootStatus = shootStatus as (typeof TRACKER_STATUSES)[number]["value"];
-      payload.rawFootageUrl = rawFootageUrl.trim() || null;
+    if (activeStage === "edit") {
+      if (canManageAssignments) {
+        payload.editorAssignedToId = editorAssignedToId || null;
+        payload.editScheduledDate = editScheduledDate
+          ? new Date(`${editScheduledDate}T12:00:00+05:30`)
+          : null;
+        payload.editStatus = editStatus as (typeof TRACKER_STATUSES)[number]["value"];
+      }
+      if (isEditorAssignee) {
+        payload.editActualDate = editActualDate
+          ? new Date(`${editActualDate}T12:00:00+05:30`)
+          : null;
+        payload.editStatus = editStatus as (typeof TRACKER_STATUSES)[number]["value"];
+        payload.approvedVideoUrl = approvedVideoUrl.trim() || null;
+      }
     }
 
-    if (isEditorAssignee) {
-      payload.editActualDate = editActualDate
-        ? new Date(`${editActualDate}T12:00:00+05:30`)
-        : null;
-      payload.editStatus = editStatus as (typeof TRACKER_STATUSES)[number]["value"];
-      payload.approvedVideoUrl = approvedVideoUrl.trim() || null;
-    }
-
-    if (isPostAssignee) {
-      payload.postActualDate = postActualDate
-        ? new Date(`${postActualDate}T12:00:00+05:30`)
-        : null;
-      payload.postStatus = postStatus as (typeof TRACKER_STATUSES)[number]["value"];
-      payload.livePostUrl = livePostUrl.trim() || null;
+    if (activeStage === "post") {
+      if (canManageAssignments) {
+        payload.postAssignedToId = postAssignedToId || null;
+        payload.postScheduledDate = postScheduledDate
+          ? new Date(`${postScheduledDate}T12:00:00+05:30`)
+          : null;
+        payload.postStatus = postStatus as (typeof TRACKER_STATUSES)[number]["value"];
+      }
+      if (isPostAssignee) {
+        payload.postActualDate = postActualDate
+          ? new Date(`${postActualDate}T12:00:00+05:30`)
+          : null;
+        payload.postStatus = postStatus as (typeof TRACKER_STATUSES)[number]["value"];
+        payload.livePostUrl = livePostUrl.trim() || null;
+      }
     }
 
     const res = await updateContentTrackerAction(payload);
@@ -184,7 +243,26 @@ export function DeliverableTrackerEditor({
           </button>
         </div>
 
-        <form onSubmit={handleSave} className="p-5 space-y-6">
+        <form onSubmit={handleSave} className="p-5 space-y-5">
+          {availableStages.length > 1 && (
+            <div className="flex items-center gap-1.5 p-1 rounded-lg bg-[#F1F3F9] border border-[#E5E7EB]">
+              {availableStages.map((tab) => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setActiveStage(tab.key)}
+                  className={`flex-1 px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                    activeStage === tab.key
+                      ? "bg-white text-[#202638] shadow-sm"
+                      : "text-[#64748B] hover:text-[#202638]"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          )}
+
           {error && (
             <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-[#E11D48]">
               {error}
@@ -192,7 +270,7 @@ export function DeliverableTrackerEditor({
           )}
 
           {/* Shoot / Cameraman */}
-          {(canManageAssignments || isShootAssignee) && (
+          {activeStage === "shoot" && (canManageAssignments || isShootAssignee) && (
             <div className="space-y-3 p-4 rounded-lg bg-[#F7F8FC] border border-[#E5E7EB]">
               <h4 className="text-xs font-semibold uppercase tracking-wider text-[#4F46E5]">
                 1. Shoot / Cameraman
@@ -210,7 +288,7 @@ export function DeliverableTrackerEditor({
                         className="flex h-9 w-full rounded-lg border border-[#E5E7EB] bg-white px-3 text-sm text-[#202638]"
                       >
                         <option value="">Unassigned</option>
-                        {employees.map((emp) => (
+                        {shootEmployees.map((emp) => (
                           <option key={emp.id} value={emp.id}>
                             {emp.fullName} {emp.designation ? `(${emp.designation})` : ""}
                           </option>
@@ -267,7 +345,7 @@ export function DeliverableTrackerEditor({
           )}
 
           {/* Video Editor */}
-          {(canManageAssignments || isEditorAssignee) && (
+          {activeStage === "edit" && (canManageAssignments || isEditorAssignee) && (
             <div className="space-y-3 p-4 rounded-lg bg-[#F7F8FC] border border-[#E5E7EB]">
               <h4 className="text-xs font-semibold uppercase tracking-wider text-[#7C3AED]">
                 2. Video Editor
@@ -285,7 +363,7 @@ export function DeliverableTrackerEditor({
                         className="flex h-9 w-full rounded-lg border border-[#E5E7EB] bg-white px-3 text-sm text-[#202638]"
                       >
                         <option value="">Unassigned</option>
-                        {employees.map((emp) => (
+                        {editorEmployees.map((emp) => (
                           <option key={emp.id} value={emp.id}>
                             {emp.fullName} {emp.designation ? `(${emp.designation})` : ""}
                           </option>
@@ -342,7 +420,7 @@ export function DeliverableTrackerEditor({
           )}
 
           {/* Social Media Publishing */}
-          {(canManageAssignments || isPostAssignee) && (
+          {activeStage === "post" && (canManageAssignments || isPostAssignee) && (
             <div className="space-y-3 p-4 rounded-lg bg-[#F7F8FC] border border-[#E5E7EB]">
               <h4 className="text-xs font-semibold uppercase tracking-wider text-[#202638]">
                 3. Social Media Publishing
@@ -360,7 +438,7 @@ export function DeliverableTrackerEditor({
                         className="flex h-9 w-full rounded-lg border border-[#E5E7EB] bg-white px-3 text-sm text-[#202638]"
                       >
                         <option value="">Unassigned</option>
-                        {employees.map((emp) => (
+                        {publisherEmployees.map((emp) => (
                           <option key={emp.id} value={emp.id}>
                             {emp.fullName} {emp.designation ? `(${emp.designation})` : ""}
                           </option>

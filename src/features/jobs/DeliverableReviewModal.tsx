@@ -10,6 +10,8 @@ interface DeliverableReviewModalProps {
   deliverableId: string;
   deliverableTitle: string;
   submissionId?: string | null;
+  canRate: boolean;
+  existingRating?: number | null;
   onClose: () => void;
 }
 
@@ -17,11 +19,13 @@ export function DeliverableReviewModal({
   deliverableId,
   deliverableTitle,
   submissionId,
+  canRate,
+  existingRating,
   onClose,
 }: DeliverableReviewModalProps) {
   const router = useRouter();
   const [status, setStatus] = useState<"APPROVED" | "REVISION_REQUESTED" | "REJECTED">("APPROVED");
-  const [stars, setStars] = useState<number>(4);
+  const [stars, setStars] = useState<number>(existingRating ?? 4);
   const [publicFeedback, setPublicFeedback] = useState("");
   const [privateNotes, setPrivateNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -38,7 +42,7 @@ export function DeliverableReviewModal({
         deliverableId,
         submissionId: submissionId || null,
         status,
-        stars,
+        stars: canRate ? stars : null,
         publicFeedback: publicFeedback.trim() || null,
         privateNotes: privateNotes.trim() || null,
       });
@@ -62,7 +66,9 @@ export function DeliverableReviewModal({
       <div className="w-full max-w-lg rounded-xl bg-white border border-[#E5E7EB] shadow-xl overflow-hidden">
         <div className="px-5 py-4 border-b border-[#E5E7EB] flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-semibold text-[#202638]">Review &amp; Rate Deliverable</h3>
+            <h3 className="text-sm font-semibold text-[#202638]">
+              {canRate ? "Review & Rate Deliverable" : "Team Lead Review"}
+            </h3>
             <p className="text-xs text-[#64748B]">{deliverableTitle}</p>
           </div>
           <button
@@ -119,31 +125,37 @@ export function DeliverableReviewModal({
             </div>
           </div>
 
-          {/* 1-5 Star Rating */}
-          <div>
-            <label className="block text-xs font-medium text-[#202638] mb-2">
-              Overall Output Rating ({stars} / 5 Stars)
-            </label>
-            <div className="flex items-center gap-1.5">
-              {[1, 2, 3, 4, 5].map((value) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setStars(value)}
-                  aria-label={`Rate ${value} stars`}
-                  className="p-1 rounded hover:bg-[#F1F3F9] cursor-pointer"
-                >
-                  <Star
-                    className={`w-6 h-6 transition-colors ${
-                      value <= stars
-                        ? "fill-[#4F46E5] text-[#4F46E5]"
-                        : "text-slate-300"
-                    }`}
-                  />
-                </button>
-              ))}
+          {/* 1-5 Star Rating (Main Manager Only) */}
+          {canRate ? (
+            <div>
+              <label className="block text-xs font-medium text-[#202638] mb-2">
+                Overall Output Rating ({stars} / 5 Stars){existingRating ? " — Edit Rating" : ""}
+              </label>
+              <div className="flex items-center gap-1.5">
+                {[1, 2, 3, 4, 5].map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setStars(value)}
+                    aria-label={`Rate ${value} stars`}
+                    className="p-1 rounded hover:bg-[#F1F3F9] cursor-pointer"
+                  >
+                    <Star
+                      className={`w-6 h-6 transition-colors ${
+                        value <= stars
+                          ? "fill-[#4F46E5] text-[#4F46E5]"
+                          : "text-slate-300"
+                      }`}
+                    />
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="p-3 rounded-lg bg-[#F7F8FC] border border-[#E5E7EB] text-xs text-[#64748B]">
+              Team Lead review records your approval or revision decision. Only the Main Manager (Deepak) can award or edit the 1–5 star rating.
+            </div>
+          )}
 
           {/* Public Feedback */}
           <div>

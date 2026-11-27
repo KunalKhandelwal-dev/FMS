@@ -216,6 +216,7 @@ export default async function JobDetailsPage({
         employees={employees}
         currentUserId={user.id}
         canReview={canReview}
+        canRate={user.role === "MAIN_MANAGER"}
         canManageTracker={
           canEdit ||
           job.ownerId === user.id ||

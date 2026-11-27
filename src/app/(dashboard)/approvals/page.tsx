@@ -20,12 +20,25 @@ export default async function ApprovalsPage() {
     where: {
       workflowState: { in: ["SUBMITTED", "UNDER_REVIEW", "REVISION_REQUESTED"] },
       ...(user.role !== "MAIN_MANAGER"
-        ? { job: { OR: [{ ownerId: user.id }, { assignedDeputyId: user.id }] } }
+        ? {
+            job: {
+              OR: [
+                { ownerId: user.id },
+                { assignedDeputyId: user.id },
+                { team: { leadId: user.id } },
+              ],
+            },
+          }
         : {}),
     },
     include: {
       job: { select: { id: true, title: true, category: true } },
       assignedTo: { select: { fullName: true } },
+      reviews: {
+        orderBy: { reviewedAt: "desc" },
+        take: 1,
+        include: { reviewer: { select: { fullName: true, role: true } } },
+      },
       submissions: {
         orderBy: { submittedAt: "desc" },
         take: 1,
@@ -53,6 +66,11 @@ export default async function ApprovalsPage() {
           <div className="divide-y divide-[#E5E7EB]">
             {pendingDeliverables.map((d) => {
               const latest = d.submissions[0];
+              const latestReview = d.reviews[0];
+              const teamLeadApproved =
+                d.workflowState === "UNDER_REVIEW" &&
+                latestReview?.status === "APPROVED" &&
+                latestReview.reviewer.role !== "MAIN_MANAGER";
               const deliveryStatus = calculateDeliveryStatus({
                 targetDate: d.targetDate,
                 firstSubmittedAt: d.firstSubmittedAt,
@@ -70,6 +88,11 @@ export default async function ApprovalsPage() {
                       </span>
                       <StatusBadge type="workflow" status={d.workflowState} />
                       <StatusBadge type="delivery" status={deliveryStatus} />
+                      {teamLeadApproved && (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium border bg-emerald-50 text-emerald-700 border-emerald-200">
+                          Approved by {latestReview.reviewer.fullName} • Awaiting Main Manager Rating
+                        </span>
+                      )}
                     </div>
                     <p className="text-xs text-[#64748B] mt-1">
                       Submitted by{" "}
@@ -85,7 +108,7 @@ export default async function ApprovalsPage() {
                     href={`/jobs/${d.jobId}`}
                     className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#4F46E5] text-white text-xs font-medium hover:bg-[#4338CA] shrink-0"
                   >
-                    Open &amp; Rate
+                    {user.role === "MAIN_MANAGER" ? "Open & Rate" : "Open & Review"}
                     <ArrowRight className="w-3.5 h-3.5" />
                   </Link>
                 </div>

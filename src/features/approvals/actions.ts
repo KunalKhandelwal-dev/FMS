@@ -13,7 +13,7 @@ export async function reviewDeliverableAction(
     const user = await requireAuthenticatedUser();
     requirePermission(user, "review:approve");
 
-    if (rawInput.stars) {
+    if (rawInput.stars != null) {
       requirePermission(user, "rating:create");
     }
 
@@ -25,7 +25,7 @@ export async function reviewDeliverableAction(
       };
     }
 
-    const review = await approvalService.submitReview(user.id, parsed.data);
+    const review = await approvalService.submitReview(user.id, parsed.data, user.role);
 
     revalidatePath("/dashboard");
     revalidatePath("/approvals");

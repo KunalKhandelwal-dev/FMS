@@ -4,14 +4,36 @@ import {
   ApprovalStatus,
   AuditAction,
   TaskAssignmentStatus,
+  UserRole,
+  UserStatus,
   WorkflowState,
 } from "@prisma/client";
 import type { ApprovalReviewInput, PerformanceRatingInput } from "@/validations/approval";
 import { calculateDeliveryStatus } from "@/lib/dates";
 
 export class ApprovalService {
-  async submitReview(reviewerId: string, input: ApprovalReviewInput) {
+  async submitReview(
+    reviewerId: string,
+    input: ApprovalReviewInput,
+    reviewerRole?: UserRole
+  ) {
     return db.$transaction(async (tx) => {
+      const effectiveRole =
+        reviewerRole ??
+        (
+          await tx.user.findUnique({
+            where: { id: reviewerId },
+            select: { role: true },
+          })
+        )?.role ??
+        UserRole.TEAM_LEAD;
+
+      const isMainManager = effectiveRole === UserRole.MAIN_MANAGER;
+
+      if (input.stars != null && !isMainManager) {
+        throw new Error("Only the Main Manager can rate deliverables.");
+      }
+
       const review = await tx.approvalReview.create({
         data: {
           deliverableId: input.deliverableId || null,
@@ -30,18 +52,44 @@ export class ApprovalService {
       if (input.deliverableId) {
         const deliverable = await tx.deliverable.findUnique({
           where: { id: input.deliverableId },
-          include: { job: { select: { id: true, title: true, ownerId: true } } },
+          include: {
+            job: { select: { id: true, title: true, ownerId: true } },
+            submissions: { select: { id: true }, take: 1 },
+          },
         });
 
         if (deliverable) {
+          const hasSubmissionOrOutput =
+            deliverable.submissions.length > 0 ||
+            Boolean(deliverable.rawFootageUrl) ||
+            Boolean(deliverable.approvedVideoUrl) ||
+            Boolean(deliverable.googleDriveUrl) ||
+            Boolean(deliverable.livePostUrl) ||
+            deliverable.workflowState === WorkflowState.SUBMITTED ||
+            deliverable.workflowState === WorkflowState.UNDER_REVIEW ||
+            deliverable.workflowState === WorkflowState.APPROVED;
+
+          if (!hasSubmissionOrOutput) {
+            throw new Error(
+              "Review or approval is not available until the assigned person has submitted work."
+            );
+          }
+
           jobIdForAudit = deliverable.jobId;
 
           const nextWorkflowState =
             input.status === ApprovalStatus.APPROVED
-              ? WorkflowState.APPROVED
+              ? isMainManager
+                ? WorkflowState.APPROVED
+                : WorkflowState.UNDER_REVIEW
               : input.status === ApprovalStatus.REVISION_REQUESTED
               ? WorkflowState.REVISION_REQUESTED
               : WorkflowState.UNDER_REVIEW;
+
+          const nextApprovalStatus =
+            input.status === ApprovalStatus.APPROVED && !isMainManager
+              ? ApprovalStatus.PENDING_REVIEW
+              : (input.status as ApprovalStatus);
 
           // Preserve initial timeliness using firstSubmittedAt
           const deliveryStatus = calculateDeliveryStatus({
@@ -53,38 +101,78 @@ export class ApprovalService {
           await tx.deliverable.update({
             where: { id: deliverable.id },
             data: {
-              approvalStatus: input.status as ApprovalStatus,
+              approvalStatus: nextApprovalStatus,
               workflowState: nextWorkflowState,
               deliveryStatus,
-              completedAt: input.status === ApprovalStatus.APPROVED ? new Date() : null,
+              completedAt:
+                input.status === ApprovalStatus.APPROVED && isMainManager ? new Date() : null,
             },
           });
 
           const recipientId = deliverable.assignedToId || deliverable.job.ownerId;
 
-          // Save 1-5 star rating if provided
-          if (input.stars && recipientId) {
-            await tx.performanceRating.create({
-              data: {
-                deliverableId: deliverable.id,
-                givenById: reviewerId,
-                receivedById: recipientId,
-                stars: input.stars,
-                feedback: input.publicFeedback || null,
-                isManagerNote: false,
-              },
+          // Only Main Manager can create or edit 1-5 star rating
+          if (isMainManager && input.stars != null && recipientId) {
+            const existingRating = await tx.performanceRating.findFirst({
+              where: { deliverableId: deliverable.id, givenById: reviewerId },
+              orderBy: { createdAt: "desc" },
             });
+
+            if (existingRating) {
+              await tx.performanceRating.update({
+                where: { id: existingRating.id },
+                data: {
+                  stars: input.stars,
+                  feedback: input.publicFeedback ?? existingRating.feedback,
+                },
+              });
+            } else {
+              await tx.performanceRating.create({
+                data: {
+                  deliverableId: deliverable.id,
+                  givenById: reviewerId,
+                  receivedById: recipientId,
+                  stars: input.stars,
+                  feedback: input.publicFeedback || null,
+                  isManagerNote: false,
+                },
+              });
+            }
           }
 
           if (recipientId) {
+            const statusText =
+              input.status === ApprovalStatus.APPROVED && !isMainManager
+                ? "approved by Team Lead (awaiting Main Manager final approval & rating)"
+                : `marked ${input.status.replace(/_/g, " ")}`;
+
             await tx.notification.create({
               data: {
                 userId: recipientId,
                 title: `Review Update: ${deliverable.title}`,
-                message: `Your deliverable "${deliverable.title}" (${deliverable.job.title}) was marked ${input.status.replace(/_/g, " ")}.`,
-                link: `/my-work`,
+                message: `Your deliverable "${deliverable.title}" (${deliverable.job.title}) was ${statusText}.`,
+                link: `/jobs/${deliverable.jobId}`,
               },
             });
+          }
+
+          // When Team Lead approves, notify Main Manager(s) that it is ready for final approval & rating
+          if (input.status === ApprovalStatus.APPROVED && !isMainManager) {
+            const managers = await tx.user.findMany({
+              where: { role: UserRole.MAIN_MANAGER, status: UserStatus.ACTIVE },
+              select: { id: true },
+            });
+
+            if (managers.length > 0) {
+              await tx.notification.createMany({
+                data: managers.map((mgr) => ({
+                  userId: mgr.id,
+                  title: `Ready for Final Approval & Rating: ${deliverable.title}`,
+                  message: `Team Lead approved "${deliverable.title}" (${deliverable.job.title}). Please review and award rating.`,
+                  link: `/jobs/${deliverable.jobId}`,
+                })),
+              });
+            }
           }
         }
       }
