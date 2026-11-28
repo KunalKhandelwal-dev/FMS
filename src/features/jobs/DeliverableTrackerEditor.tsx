@@ -165,7 +165,6 @@ export function DeliverableTrackerEditor({
         payload.shootScheduledDate = shootScheduledDate
           ? new Date(`${shootScheduledDate}T12:00:00+05:30`)
           : null;
-        payload.shootStatus = shootStatus as (typeof TRACKER_STATUSES)[number]["value"];
       }
       if (isShootAssignee) {
         payload.shootActualDate = shootActualDate
@@ -182,7 +181,6 @@ export function DeliverableTrackerEditor({
         payload.editScheduledDate = editScheduledDate
           ? new Date(`${editScheduledDate}T12:00:00+05:30`)
           : null;
-        payload.editStatus = editStatus as (typeof TRACKER_STATUSES)[number]["value"];
       }
       if (isEditorAssignee) {
         payload.editActualDate = editActualDate
@@ -199,7 +197,6 @@ export function DeliverableTrackerEditor({
         payload.postScheduledDate = postScheduledDate
           ? new Date(`${postScheduledDate}T12:00:00+05:30`)
           : null;
-        payload.postStatus = postStatus as (typeof TRACKER_STATUSES)[number]["value"];
       }
       if (isPostAssignee) {
         payload.postActualDate = postActualDate
@@ -303,29 +300,31 @@ export function DeliverableTrackerEditor({
                     />
                   </>
                 )}
-                <div>
-                  <label className="block text-xs font-medium text-[#202638] mb-1">
-                    Shoot Status
-                  </label>
-                  <select
-                    value={shootStatus}
-                    onChange={(e) => setShootStatus(e.target.value)}
-                    className="flex h-9 w-full rounded-lg border border-[#E5E7EB] bg-white px-3 text-sm text-[#202638]"
-                  >
-                    {TRACKER_STATUSES.map((s) => (
-                      <option key={s.value} value={s.value}>
-                        {s.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
                 {isShootAssignee && (
-                  <Input
-                    type="date"
-                    label="Shoot Actual Date"
-                    value={shootActualDate}
-                    onChange={(e) => setShootActualDate(e.target.value)}
-                  />
+                  <>
+                    <div>
+                      <label className="block text-xs font-medium text-[#202638] mb-1">
+                        Shoot Status
+                      </label>
+                      <select
+                        value={shootStatus}
+                        onChange={(e) => setShootStatus(e.target.value)}
+                        className="flex h-9 w-full rounded-lg border border-[#E5E7EB] bg-white px-3 text-sm text-[#202638]"
+                      >
+                        {TRACKER_STATUSES.map((s) => (
+                          <option key={s.value} value={s.value}>
+                            {s.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <Input
+                      type="date"
+                      label="Shoot Actual Date"
+                      value={shootActualDate}
+                      onChange={(e) => setShootActualDate(e.target.value)}
+                    />
+                  </>
                 )}
               </div>
               {isShootAssignee ? (
@@ -338,7 +337,7 @@ export function DeliverableTrackerEditor({
                 />
               ) : (
                 <p className="text-[11px] text-[#64748B]">
-                  Raw footage link and completion date can only be submitted by the assigned Shoot / Cameraman.
+                  Shoot status, completion date, and link can only be updated by the assigned Shoot / Cameraman.
                 </p>
               )}
             </div>
@@ -378,29 +377,31 @@ export function DeliverableTrackerEditor({
                     />
                   </>
                 )}
-                <div>
-                  <label className="block text-xs font-medium text-[#202638] mb-1">
-                    Edit Status
-                  </label>
-                  <select
-                    value={editStatus}
-                    onChange={(e) => setEditStatus(e.target.value)}
-                    className="flex h-9 w-full rounded-lg border border-[#E5E7EB] bg-white px-3 text-sm text-[#202638]"
-                  >
-                    {TRACKER_STATUSES.map((s) => (
-                      <option key={s.value} value={s.value}>
-                        {s.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
                 {isEditorAssignee && (
-                  <Input
-                    type="date"
-                    label="Edit Actual Date"
-                    value={editActualDate}
-                    onChange={(e) => setEditActualDate(e.target.value)}
-                  />
+                  <>
+                    <div>
+                      <label className="block text-xs font-medium text-[#202638] mb-1">
+                        Edit Status
+                      </label>
+                      <select
+                        value={editStatus}
+                        onChange={(e) => setEditStatus(e.target.value)}
+                        className="flex h-9 w-full rounded-lg border border-[#E5E7EB] bg-white px-3 text-sm text-[#202638]"
+                      >
+                        {TRACKER_STATUSES.map((s) => (
+                          <option key={s.value} value={s.value}>
+                            {s.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <Input
+                      type="date"
+                      label="Edit Actual Date"
+                      value={editActualDate}
+                      onChange={(e) => setEditActualDate(e.target.value)}
+                    />
+                  </>
                 )}
               </div>
               {isEditorAssignee ? (
@@ -413,7 +414,7 @@ export function DeliverableTrackerEditor({
                 />
               ) : (
                 <p className="text-[11px] text-[#64748B]">
-                  Approved video link and completion date can only be submitted by the assigned Video Editor.
+                  Edit status, completion date, and link can only be updated by the assigned Video Editor.
                 </p>
               )}
             </div>
@@ -453,29 +454,31 @@ export function DeliverableTrackerEditor({
                     />
                   </>
                 )}
-                <div>
-                  <label className="block text-xs font-medium text-[#202638] mb-1">
-                    Publishing Status
-                  </label>
-                  <select
-                    value={postStatus}
-                    onChange={(e) => setPostStatus(e.target.value)}
-                    className="flex h-9 w-full rounded-lg border border-[#E5E7EB] bg-white px-3 text-sm text-[#202638]"
-                  >
-                    {TRACKER_STATUSES.map((s) => (
-                      <option key={s.value} value={s.value}>
-                        {s.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
                 {isPostAssignee && (
-                  <Input
-                    type="date"
-                    label="Post Actual Date"
-                    value={postActualDate}
-                    onChange={(e) => setPostActualDate(e.target.value)}
-                  />
+                  <>
+                    <div>
+                      <label className="block text-xs font-medium text-[#202638] mb-1">
+                        Publishing Status
+                      </label>
+                      <select
+                        value={postStatus}
+                        onChange={(e) => setPostStatus(e.target.value)}
+                        className="flex h-9 w-full rounded-lg border border-[#E5E7EB] bg-white px-3 text-sm text-[#202638]"
+                      >
+                        {TRACKER_STATUSES.map((s) => (
+                          <option key={s.value} value={s.value}>
+                            {s.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <Input
+                      type="date"
+                      label="Post Actual Date"
+                      value={postActualDate}
+                      onChange={(e) => setPostActualDate(e.target.value)}
+                    />
+                  </>
                 )}
               </div>
               {isPostAssignee ? (
@@ -488,7 +491,7 @@ export function DeliverableTrackerEditor({
                 />
               ) : (
                 <p className="text-[11px] text-[#64748B]">
-                  Live post link and post date can only be submitted by the assigned Social Media Publisher.
+                  Publishing status, post date, and live link can only be updated by the assigned Social Media Publisher.
                 </p>
               )}
             </div>

@@ -181,14 +181,14 @@ export async function updateContentTrackerAction(
       };
     }
 
-    if (input.shootStatus !== undefined && !canManageAssignments && !isShootAssignee) {
-      return { success: false, error: "Access denied for shoot status update." };
+    if (input.shootStatus !== undefined && !isShootAssignee) {
+      return { success: false, error: "Only the assigned Shoot / Cameraman can update the shoot status." };
     }
-    if (input.editStatus !== undefined && !canManageAssignments && !isEditorAssignee) {
-      return { success: false, error: "Access denied for edit status update." };
+    if (input.editStatus !== undefined && !isEditorAssignee) {
+      return { success: false, error: "Only the assigned Video Editor can update the edit status." };
     }
-    if (input.postStatus !== undefined && !canManageAssignments && !isPostAssignee) {
-      return { success: false, error: "Access denied for social publishing status update." };
+    if (input.postStatus !== undefined && !isPostAssignee) {
+      return { success: false, error: "Only the assigned Social Media Publisher can update the publishing status." };
     }
 
     const updated = await deliverableService.updateTracker(user.id, input);
