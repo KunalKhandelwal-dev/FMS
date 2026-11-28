@@ -159,7 +159,7 @@ export function DeliverableTrackerEditor({
       deliverableId: deliverable.id,
     };
 
-    if (activeStage === "shoot") {
+    if (visibleStageKeys.includes("shoot")) {
       if (canManageAssignments) {
         payload.shootAssignedToId = shootAssignedToId || null;
         payload.shootScheduledDate = shootScheduledDate
@@ -175,7 +175,7 @@ export function DeliverableTrackerEditor({
       }
     }
 
-    if (activeStage === "edit") {
+    if (visibleStageKeys.includes("edit")) {
       if (canManageAssignments) {
         payload.editorAssignedToId = editorAssignedToId || null;
         payload.editScheduledDate = editScheduledDate
@@ -191,7 +191,7 @@ export function DeliverableTrackerEditor({
       }
     }
 
-    if (activeStage === "post") {
+    if (visibleStageKeys.includes("post")) {
       if (canManageAssignments) {
         payload.postAssignedToId = postAssignedToId || null;
         payload.postScheduledDate = postScheduledDate

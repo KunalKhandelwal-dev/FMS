@@ -118,6 +118,12 @@ export default async function BrandingJobDetailPage({
               : null,
           }}
           canManageCredits={user.role === "MAIN_MANAGER"}
+          currentUserId={user.id}
+          canAssignStages={
+            user.role === "MAIN_MANAGER" ||
+            job.ownerId === user.id ||
+            job.assignedDeputyId === user.id
+          }
         />
       )}
     </div>

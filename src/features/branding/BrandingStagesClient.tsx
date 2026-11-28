@@ -38,6 +38,8 @@ export function BrandingStagesClient({
   employees,
   credits,
   canManageCredits,
+  currentUserId,
+  canAssignStages,
 }: {
   deliverableId: string;
   stages: StageItem[];
@@ -48,6 +50,8 @@ export function BrandingStagesClient({
     creditsAllocated: number | null;
   };
   canManageCredits: boolean;
+  currentUserId: string;
+  canAssignStages: boolean;
 }) {
   const router = useRouter();
   const [editingStageId, setEditingStageId] = useState<string | null>(null);
@@ -76,20 +80,34 @@ export function BrandingStagesClient({
     setNotes(s.notes || "");
   }
 
-  async function saveStage(stageId: string) {
+  async function saveStage(stage: StageItem) {
     setSavingStage(true);
+    const isAssignee = stage.responsibleUserId === currentUserId;
+    const preservedStatus = stage.status as
+      | "NOT_INITIATED"
+      | "IN_PROGRESS"
+      | "COMPLETED_ON_TIME"
+      | "LATE_COMPLETED"
+      | "NOT_DONE"
+      | "CANCELLED";
     await updateBrandingStageAction({
-      stageId,
-      responsibleUserId: responsibleUserId || null,
-      status: stageStatus as
-        | "NOT_INITIATED"
-        | "IN_PROGRESS"
-        | "COMPLETED_ON_TIME"
-        | "LATE_COMPLETED"
-        | "NOT_DONE"
-        | "CANCELLED",
-      driveUrl: driveUrl.trim() || null,
-      notes: notes.trim() || null,
+      stageId: stage.id,
+      ...(canAssignStages ? { responsibleUserId: responsibleUserId || null } : {}),
+      status: isAssignee
+        ? (stageStatus as
+            | "NOT_INITIATED"
+            | "IN_PROGRESS"
+            | "COMPLETED_ON_TIME"
+            | "LATE_COMPLETED"
+            | "NOT_DONE"
+            | "CANCELLED")
+        : preservedStatus,
+      ...(isAssignee
+        ? {
+            driveUrl: driveUrl.trim() || null,
+            notes: notes.trim() || null,
+          }
+        : {}),
     });
     setSavingStage(false);
     setEditingStageId(null);
@@ -151,9 +169,9 @@ export function BrandingStagesClient({
                     )}
                   </div>
 
-                  {!isEditing && (
+                  {!isEditing && (canAssignStages || s.responsibleUserId === currentUserId) && (
                     <Button variant="outline" size="sm" onClick={() => startEdit(s)}>
-                      Update Stage
+                      {canAssignStages ? "Assign / Edit" : "Update My Stage"}
                     </Button>
                   )}
                 </div>
@@ -161,56 +179,68 @@ export function BrandingStagesClient({
                 {isEditing && (
                   <div className="p-4 rounded-lg bg-[#F7F8FC] border border-[#E5E7EB] space-y-3">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-medium text-[#202638] mb-1">
-                          Responsible Employee
-                        </label>
-                        <select
-                          value={responsibleUserId}
-                          onChange={(e) => setResponsibleUserId(e.target.value)}
-                          className="flex h-9 w-full rounded-lg border border-[#E5E7EB] bg-white px-3 text-sm text-[#202638]"
-                        >
-                          <option value="">Unassigned</option>
-                          {employees.map((emp) => (
-                            <option key={emp.id} value={emp.id}>
-                              {emp.fullName}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                      {canAssignStages && (
+                        <div>
+                          <label className="block text-xs font-medium text-[#202638] mb-1">
+                            Responsible Employee
+                          </label>
+                          <select
+                            value={responsibleUserId}
+                            onChange={(e) => setResponsibleUserId(e.target.value)}
+                            className="flex h-9 w-full rounded-lg border border-[#E5E7EB] bg-white px-3 text-sm text-[#202638]"
+                          >
+                            <option value="">Unassigned</option>
+                            {employees.map((emp) => (
+                              <option key={emp.id} value={emp.id}>
+                                {emp.fullName}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
 
-                      <div>
-                        <label className="block text-xs font-medium text-[#202638] mb-1">
-                          Stage Status
-                        </label>
-                        <select
-                          value={stageStatus}
-                          onChange={(e) => setStageStatus(e.target.value)}
-                          className="flex h-9 w-full rounded-lg border border-[#E5E7EB] bg-white px-3 text-sm text-[#202638]"
-                        >
-                          <option value="NOT_INITIATED">Not Done</option>
-                          <option value="IN_PROGRESS">In Process</option>
-                          <option value="COMPLETED_ON_TIME">Done / Approved (On Time)</option>
-                          <option value="LATE_COMPLETED">Done (Late)</option>
-                          <option value="CANCELLED">Cancelled</option>
-                        </select>
-                      </div>
+                      {s.responsibleUserId === currentUserId && (
+                        <div>
+                          <label className="block text-xs font-medium text-[#202638] mb-1">
+                            Stage Status
+                          </label>
+                          <select
+                            value={stageStatus}
+                            onChange={(e) => setStageStatus(e.target.value)}
+                            className="flex h-9 w-full rounded-lg border border-[#E5E7EB] bg-white px-3 text-sm text-[#202638]"
+                          >
+                            <option value="NOT_INITIATED">Not Done</option>
+                            <option value="IN_PROGRESS">In Process</option>
+                            <option value="COMPLETED_ON_TIME">Done / Approved (On Time)</option>
+                            <option value="LATE_COMPLETED">Done (Late)</option>
+                            <option value="CANCELLED">Cancelled</option>
+                          </select>
+                        </div>
+                      )}
                     </div>
 
-                    <Input
-                      type="url"
-                      label="Google Drive Link"
-                      placeholder="https://drive.google.com/..."
-                      value={driveUrl}
-                      onChange={(e) => setDriveUrl(e.target.value)}
-                    />
+                    {s.responsibleUserId === currentUserId ? (
+                      <>
+                        <Input
+                          type="url"
+                          label="Google Drive Link"
+                          placeholder="https://drive.google.com/..."
+                          value={driveUrl}
+                          onChange={(e) => setDriveUrl(e.target.value)}
+                        />
 
-                    <Input
-                      label="Stage Notes"
-                      placeholder="Optional progress remarks..."
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                    />
+                        <Input
+                          label="Stage Notes"
+                          placeholder="Optional progress remarks..."
+                          value={notes}
+                          onChange={(e) => setNotes(e.target.value)}
+                        />
+                      </>
+                    ) : (
+                      <p className="text-[11px] text-[#64748B]">
+                        Stage status, Google Drive link, and notes can only be updated by the assigned employee.
+                      </p>
+                    )}
 
                     <div className="flex justify-end gap-2">
                       <Button
@@ -226,7 +256,7 @@ export function BrandingStagesClient({
                         variant="primary"
                         size="sm"
                         isLoading={savingStage}
-                        onClick={() => saveStage(s.id)}
+                        onClick={() => saveStage(s)}
                       >
                         <Save className="w-3.5 h-3.5 mr-1.5" />
                         Save Stage
