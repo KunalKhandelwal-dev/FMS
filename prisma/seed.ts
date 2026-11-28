@@ -474,8 +474,10 @@ async function main() {
         },
       });
 
+      const activeTeamIds = [primaryTeamId];
       if (emp.secondaryTeamCode) {
         const secondaryTeamId = teamByCode[emp.secondaryTeamCode];
+        activeTeamIds.push(secondaryTeamId);
         await prisma.teamMembership.upsert({
           where: { userId_teamId: { userId: user.id, teamId: secondaryTeamId } },
           update: {
@@ -494,6 +496,12 @@ async function main() {
           },
         });
       }
+
+      // Deactivate any stale memberships from earlier organizational structures
+      await prisma.teamMembership.updateMany({
+        where: { userId: user.id, teamId: { notIn: activeTeamIds } },
+        data: { status: "INACTIVE", isPrimary: false, leftAt: new Date() },
+      });
     }
 
     // Set team heads on the 3 teams

@@ -30,7 +30,12 @@ export class JobService {
           select: {
             id: true,
             fullName: true,
-            teamMemberships: { select: { teamId: true }, take: 1 },
+            ledTeams: { where: { isActive: true }, select: { id: true }, take: 1 },
+            teamMemberships: {
+              where: { status: "ACTIVE", isPrimary: true },
+              select: { teamId: true },
+              take: 1,
+            },
           },
         });
 
@@ -48,7 +53,7 @@ export class JobService {
             priority: input.priority as JobPriority,
             status: JobStatus.ASSIGNED,
             departmentId,
-            teamId: owner.teamMemberships[0]?.teamId || null,
+            teamId: owner.ledTeams[0]?.id || owner.teamMemberships[0]?.teamId || null,
             createdById: creatorId,
             ownerId: owner.id,
             targetDate:
@@ -126,7 +131,12 @@ export class JobService {
           select: {
             id: true,
             fullName: true,
-            teamMemberships: { select: { teamId: true }, take: 1 },
+            ledTeams: { where: { isActive: true }, select: { id: true }, take: 1 },
+            teamMemberships: {
+              where: { status: "ACTIVE", isPrimary: true },
+              select: { teamId: true },
+              take: 1,
+            },
           },
         });
         if (!owner) {
@@ -147,7 +157,7 @@ export class JobService {
             priority: JobPriority.MEDIUM,
             status: JobStatus.ASSIGNED,
             departmentId,
-            teamId: owner.teamMemberships[0]?.teamId || null,
+            teamId: owner.ledTeams[0]?.id || owner.teamMemberships[0]?.teamId || null,
             createdById: creatorId,
             ownerId: owner.id,
             targetDate: addDays(now, 4, input.workingDaysOnly),

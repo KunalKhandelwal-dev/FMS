@@ -94,7 +94,7 @@ export async function canAccessJob(user: SessionUser, jobId: string): Promise<bo
     job.ownerId === user.id ||
     job.assignedDeputyId === user.id ||
     job.createdById === user.id ||
-    job.team?.leadId === user.id
+    (!job.ownerId && job.team?.leadId === user.id)
   ) {
     return true;
   }

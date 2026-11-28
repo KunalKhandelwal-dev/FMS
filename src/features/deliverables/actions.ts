@@ -128,10 +128,9 @@ export async function updateContentTrackerAction(
 
     const canManageAssignments =
       user.role === "MAIN_MANAGER" ||
-      user.role === "DEPUTY_MANAGER" ||
       existing.job.ownerId === user.id ||
       existing.job.assignedDeputyId === user.id ||
-      existing.job.team?.leadId === user.id;
+      (!existing.job.ownerId && existing.job.team?.leadId === user.id);
 
     const isShootAssignee = existing.shootAssignedToId === user.id;
     const isEditorAssignee = existing.editorAssignedToId === user.id;

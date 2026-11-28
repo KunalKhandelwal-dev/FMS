@@ -139,7 +139,6 @@ export async function getRoleDashboardData(user: SessionUser) {
           OR: [
             { job: { ownerId: user.id } },
             { job: { assignedDeputyId: user.id } },
-            { job: { team: { code: "TEAM-BRANDING" } } },
           ],
         },
         include: deliverableInclude,
@@ -165,7 +164,6 @@ export async function getRoleDashboardData(user: SessionUser) {
           OR: [
             { job: { ownerId: user.id } },
             { job: { assignedDeputyId: user.id } },
-            { job: { team: { code: "TEAM-ONLINE" } } },
             { stages: { some: { assignedById: user.id } } },
           ],
         },
@@ -195,7 +193,6 @@ export async function getRoleDashboardData(user: SessionUser) {
         where: {
           OR: [
             { job: { ownerId: user.id } },
-            { job: { team: { code: "TEAM-CONTENT" } } },
             { stages: { some: { assignedById: user.id } } },
           ],
         },

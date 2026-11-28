@@ -218,10 +218,10 @@ export default async function JobDetailsPage({
         canReview={canReview}
         canRate={user.role === "MAIN_MANAGER"}
         canManageTracker={
-          canEdit ||
+          user.role === "MAIN_MANAGER" ||
           job.ownerId === user.id ||
           job.assignedDeputyId === user.id ||
-          job.team?.leadId === user.id
+          (!job.ownerId && job.team?.leadId === user.id)
         }
       />
     </div>

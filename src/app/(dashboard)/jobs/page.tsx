@@ -21,7 +21,7 @@ export default async function JobsPage({
   const data = await analyticsService.getManagerDashboardData({
     search: params.search,
     category: params.category,
-    ...(user.role === "EMPLOYEE" ? { ownerId: user.id } : {}),
+    ...(user.role !== "MAIN_MANAGER" ? { ownerId: user.id } : {}),
   });
 
   const canCreate = user.role === "MAIN_MANAGER";
